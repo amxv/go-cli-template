@@ -6,7 +6,8 @@ BIN_NAME ?= mycli
 CMD_PATH ?= ./cmd/$(BIN_NAME)
 DIST_DIR ?= dist
 BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
-LDFLAGS ?= -s -w
+VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
+LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
 .PHONY: help fmt test vet lint check build build-all install-local clean release-tag
 

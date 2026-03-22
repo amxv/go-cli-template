@@ -25,6 +25,7 @@
     "internal",
     "go.mod",
     "README.md",
+    "LICENSE",
     "AGENTS.md",
     "CONTRIBUTORS.md",
     "Makefile"

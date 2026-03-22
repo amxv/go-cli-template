@@ -4,22 +4,27 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/amxv/go-cli-template/internal/buildinfo"
 )
 
 const commandName = "mycli"
 
-var version = "dev"
+var version = buildinfo.CurrentVersion()
 
 func Run(args []string, stdout, stderr io.Writer) error {
+	_ = stderr
+
 	if len(args) == 0 || isHelpArg(args[0]) {
 		printRootHelp(stdout)
 		return nil
 	}
-
-	switch args[0] {
-	case "version":
+	if len(args) == 1 && isVersionArg(args[0]) {
 		_, _ = fmt.Fprintf(stdout, "%s %s\n", commandName, version)
 		return nil
+	}
+
+	switch args[0] {
 	case "hello":
 		if len(args) > 1 && isHelpArg(args[1]) {
 			printHelloHelp(stdout)
@@ -39,6 +44,10 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	}
 }
 
+func isVersionArg(v string) bool {
+	return v == "--version"
+}
+
 func isHelpArg(v string) bool {
 	switch v {
 	case "-h", "--help", "help":
@@ -53,16 +62,16 @@ func printRootHelp(w io.Writer) {
 		"mycli - Go CLI template",
 		"",
 		"Usage:",
+		"  mycli [--version]",
 		"  mycli <command> [arguments]",
 		"",
 		"Commands:",
 		"  hello [name]    print a greeting",
-		"  version         print CLI version",
 		"",
 		"Examples:",
+		"  mycli --version",
 		"  mycli hello",
 		"  mycli hello agent",
-		"  mycli version",
 	)
 }
 

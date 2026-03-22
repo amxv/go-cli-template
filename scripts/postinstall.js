@@ -37,6 +37,11 @@ const binDir = path.join(rootDir, "bin");
 const binaryName = process.platform === "win32" ? `${cliName}.exe` : `${cliName}-bin`;
 const destination = path.join(binDir, binaryName);
 
+function buildLdflags(version) {
+  const resolvedVersion = `${version || ""}`.trim() || "dev";
+  return `-s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=${resolvedVersion}`;
+}
+
 async function main() {
   if (!goos || !goarch) {
     console.warn(`Unsupported platform/arch: ${process.platform}/${process.arch}`);
@@ -73,7 +78,7 @@ function fallbackBuildOrExit() {
 
   const result = spawnSync(
     "go",
-    ["build", "-o", destination, `./cmd/${cliName}`],
+    ["build", "-trimpath", `-ldflags=${buildLdflags(pkg.version)}`, "-o", destination, `./cmd/${cliName}`],
     { cwd: rootDir, stdio: "inherit" }
   );
 

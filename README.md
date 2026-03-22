@@ -19,7 +19,7 @@ mycli --help
 mycli --help
 mycli hello
 mycli hello <name>
-mycli version
+mycli --version
 ```
 
 ## Customize this template
@@ -46,6 +46,7 @@ mycli version
 
 - `cmd/mycli/main.go`: CLI entrypoint
 - `internal/app/`: command logic
+- `internal/buildinfo/`: build-time version plumbing for `--version`
 - `scripts/postinstall.js`: installs binary from GitHub release (falls back to local `go build`)
 - `.github/workflows/release.yml`: automated release pipeline
 - `AGENTS.md`: instructions for coding agents
