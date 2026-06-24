@@ -53,3 +53,7 @@ mycli --version
 - `CONTRIBUTORS.md`: maintainer/release operations
 
 See `AGENTS.md` and `CONTRIBUTORS.md` for complete dev/release instructions.
+
+## License
+
+Apache 2.0
