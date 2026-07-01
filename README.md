@@ -5,6 +5,7 @@ Minimal template for shipping a Go CLI with:
 - a local command runner (`Makefile`)
 - npm global install wrapper (`bin/mycli.js`)
 - automatic GitHub Release + npm publish on tag
+- bundled ZueDocs-powered docs site
 
 ## Install (template example)
 
@@ -22,6 +23,23 @@ mycli hello <name>
 mycli --version
 ```
 
+## Docs site
+
+This template includes an Astro docs site powered by ZueDocs.
+
+```bash
+bun install
+bun run docs:dev
+bun run docs:check
+bun run docs:build
+```
+
+Customize the docs alongside the CLI:
+
+- `src/data/docs.ts`: site name, repo URL, footer sections, nav, categories
+- `src/pages/index.astro`: landing page
+- `src/content/docs/*.md`: guides and command reference
+
 ## Customize this template
 
 1. Rename your command and entrypoint:
@@ -38,7 +56,12 @@ mycli --version
 - `internal/app/app.go`
 - `internal/app/app_test.go`
 
-4. Keep release flow:
+4. Update bundled docs:
+- `src/data/docs.ts`
+- `src/pages/index.astro`
+- `src/content/docs/*.md`
+
+5. Keep release flow:
 - push tags like `v0.2.0`
 - workflow builds binaries + creates GitHub release + publishes npm
 
@@ -49,6 +72,8 @@ mycli --version
 - `internal/buildinfo/`: build-time version plumbing for `--version`
 - `scripts/postinstall.js`: installs binary from GitHub release (falls back to local `go build`)
 - `.github/workflows/release.yml`: automated release pipeline
+- `src/`: ZueDocs-powered documentation site
+- `astro.config.mjs`: docs site build config
 - `AGENTS.md`: instructions for coding agents
 - `CONTRIBUTORS.md`: maintainer/release operations
 
