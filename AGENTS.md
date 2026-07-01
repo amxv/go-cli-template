@@ -16,6 +16,7 @@ The sample command is `mycli`. Replace it with your actual CLI name and behavior
 - `bin/mycli.js`: npm shim that invokes packaged native binary.
 - `scripts/postinstall.js`: downloads release binary on install, falls back to `go build`.
 - `.github/workflows/release.yml`: tag-driven release pipeline.
+- `src/`: ZueDocs-powered Astro documentation site for future CLIs.
 
 ## Local commands
 
@@ -35,6 +36,8 @@ Direct commands:
 - `go test ./...`
 - `go vet ./...`
 - `npm run lint`
+- `bun run docs:check`
+- `bun run docs:build`
 
 ## How to customize safely
 
@@ -53,6 +56,16 @@ Direct commands:
 
 4. Keep help output expressive and command-local (`<command> --help` should explain examples).
 
+5. Update the bundled docs site when command behavior changes:
+- `src/data/docs.ts` for site name, repo URL, nav, footer sections, and categories
+- `src/pages/index.astro` for landing-page product copy
+- `src/content/docs/*.md` for guides and command reference
+
+6. ZueDocs consumer pattern:
+- import shared layouts from `zuedocs/layouts/*`
+- import shared behavior/styles from `zuedocs/docsEnhancements` and `zuedocs/styles.css`
+- keep repo-specific content/config local instead of forking shared shell files
+
 ## Release contract
 
 Release pipeline triggers on `v*` tags and expects:
@@ -65,3 +78,4 @@ Release pipeline triggers on `v*` tags and expects:
 
 - Prefer additive changes; do not break the release asset naming contract unintentionally.
 - If you change release artifacts or CLI binary name, update both workflow and postinstall script in the same PR.
+- Run docs validation serially (`bun run docs:check` then `bun run docs:build`); do not run Astro check/build concurrently in the same repo.
