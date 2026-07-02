@@ -79,3 +79,12 @@ Release pipeline triggers on `v*` tags and expects:
 - Prefer additive changes; do not break the release asset naming contract unintentionally.
 - If you change release artifacts or CLI binary name, update both workflow and postinstall script in the same PR.
 - Run docs validation serially (`bun run docs:check` then `bun run docs:build`); do not run Astro check/build concurrently in the same repo.
+
+## Changelog and Release Skill
+
+This template includes:
+
+- `src/content/docs/changelog.md` as a placeholder changelog page for generated projects.
+- `.agents/skills/release/SKILL.md` as a release checklist that updates the changelog before tagging.
+
+When customizing the template for a real CLI, keep both files and update the placeholder changelog with the project's real version history.
