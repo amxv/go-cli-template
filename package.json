@@ -2,7 +2,7 @@
   "name": "@amxv/go-cli-template",
   "version": "0.1.0",
   "description": "Template for shipping a Go CLI via npm with GitHub release automation",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "amxv",
   "repository": {
     "type": "git",
@@ -16,7 +16,9 @@
     "mycli": "bin/mycli.js"
   },
   "config": {
-    "cliBinaryName": "mycli"
+    "cliName": "mycli",
+    "cliBinaryName": "mycli",
+    "goModule": "github.com/amxv/go-cli-template"
   },
   "files": [
     "bin/mycli.js",
@@ -28,11 +30,12 @@
     "LICENSE",
     "AGENTS.md",
     "CONTRIBUTORS.md",
-    "Makefile"
+    "Makefile",
+    "project.config.json"
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
-    "test": "node --check bin/mycli.js && node --check scripts/postinstall.js",
+    "test": "node --check bin/mycli.js && node --check scripts/postinstall.js && node --check scripts/project.js && node --check scripts/setup.js && node --check scripts/release.js",
     "lint": "npm run test",
     "docs:dev": "astro dev",
     "docs:build": "astro build",

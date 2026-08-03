@@ -31,6 +31,17 @@ make install-local
 make clean
 ```
 
+## Project setup and release
+
+```bash
+make setup SETUP_ARGS='--cli-name pluck --github-owner acme --github-repo pluck'
+make ship VERSION=0.2.0
+```
+
+Use `make release-preflight`, `make release-changelog`, `make release-sync-token`,
+`make release-npm-auth`, `make release-tag`, `make release-watch`, and
+`make release-verify` when the release needs to be operated step by step.
+
 ## Docs development
 
 ```bash
@@ -52,4 +63,5 @@ scripts/postinstall.js        # release binary installer
 .github/workflows/release.yml # release workflow
 src/content/docs/*.md         # docs content
 src/data/docs.ts              # docs site config
+project.config.json           # canonical project identity
 ```

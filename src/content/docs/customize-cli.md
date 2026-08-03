@@ -6,23 +6,29 @@ category: Development
 summary: The main checklist for turning mycli into a real Go command-line tool.
 ---
 
-## Rename the command
+## Initialize identity
 
-The starter command is `mycli`. Rename it consistently before adding real behavior:
+Run one setup command before adding real behavior:
 
 ```bash
-cmd/mycli                      # Go entrypoint directory
-bin/mycli.js                   # npm executable shim
-package.json                   # bin map and config.cliBinaryName
-.github/workflows/release.yml  # CLI_BINARY
-Makefile                       # BIN_NAME
+make setup SETUP_ARGS='--cli-name pluck \
+  --binary-name pluck \
+  --go-module github.com/acme/pluck \
+  --github-owner acme --github-repo pluck \
+  --npm-package @acme/pluck \
+  --description "A fast file picker" \
+  --homepage https://pluck.dev \
+  --canonical-url https://pluck.dev \
+  --license Apache-2.0'
 ```
 
-The release workflow and postinstall script assume a single binary name. Keep those values in sync.
+The script updates `cmd`, the npm wrapper, `package.json`, `go.mod`, `Makefile`,
+the release workflow, postinstall metadata, and `src/data/docs.ts` together. The
+CLI name and release binary name may be kept equal, or set independently.
 
 ## Update package identity
 
-Update package metadata before publishing:
+The setup command updates package metadata before publishing:
 
 ```bash
 package.json name
@@ -64,3 +70,7 @@ bun run docs:build
 ```
 
 Run the docs commands serially. Astro can be sensitive to concurrent check/build work in the same repo.
+
+The default license is Apache-2.0. Pass `--license MIT` (or another value from
+`license-generator --list`) inside `SETUP_ARGS` to regenerate `LICENSE` and
+synchronize the metadata.

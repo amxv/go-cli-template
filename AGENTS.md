@@ -15,6 +15,9 @@ The sample command is `mycli`. Replace it with your actual CLI name and behavior
 - `internal/app/app_test.go`: starter tests.
 - `bin/mycli.js`: npm shim that invokes packaged native binary.
 - `scripts/postinstall.js`: downloads release binary on install, falls back to `go build`.
+- `scripts/setup.js`: initializes command, module, repository, npm, docs, and license identity.
+- `scripts/release.js`: runs focused release checks, changelog, token, tag, watch, and verification steps.
+- `project.config.json`: canonical repeated project identity fields.
 - `.github/workflows/release.yml`: tag-driven release pipeline.
 - `src/`: ZueDocs-powered Astro documentation site for future CLIs.
 
@@ -30,6 +33,8 @@ Use `make` targets:
 - `make build`
 - `make build-all`
 - `make install-local`
+- `make setup SETUP_ARGS='...'`
+- `make ship VERSION=x.y.z`
 
 Direct commands:
 
@@ -41,16 +46,13 @@ Direct commands:
 
 ## How to customize safely
 
-1. Rename CLI command consistently in all places:
-- directory `cmd/mycli`
-- `package.json` values (`bin`, `config.cliBinaryName`)
-- `bin/mycli.js`
-- workflow env `CLI_BINARY`
-- `Makefile` `BIN_NAME`
+1. Run `make setup` to rename the CLI command consistently.
+The setup script updates the command path, npm wrapper, package metadata, Go
+module, Makefile, workflow, postinstall, docs config, and license metadata.
 
 2. Keep binary naming convention unchanged unless you also update postinstall/workflow:
-- release assets: `<cli>_<goos>_<goarch>[.exe]`
-- npm-installed binary path: `bin/<cli>-bin` (or `.exe` on Windows)
+- release assets: `<binary>_<goos>_<goarch>[.exe]`
+- npm-installed binary path: `bin/<binary>-bin` (or `.exe` on Windows)
 
 3. If adding dependencies, commit `go.sum` and optionally enable Go cache in workflow.
 
@@ -70,9 +72,10 @@ Direct commands:
 
 Release pipeline triggers on `v*` tags and expects:
 
-- `NPM_TOKEN` GitHub secret present.
+- `NPM_TOKEN` GitHub secret present, synced by `make release-sync-token`.
 - npm package name in `package.json` is publishable under your account/org.
 - repository URL matches the release origin used by `scripts/postinstall.js`.
+- public GitHub visibility is the normal anonymous npm install path.
 
 ## Guardrails
 
@@ -87,4 +90,4 @@ This template includes:
 - `src/content/docs/changelog.md` as a placeholder changelog page for generated projects.
 - `.agents/skills/release/SKILL.md` as a release checklist that updates the changelog before tagging.
 
-When customizing the template for a real CLI, keep both files and update the placeholder changelog with the project's real version history.
+When customizing the template for a real CLI, keep both files and update the placeholder changelog with the project's real version history. Use `make ship` to run checks, docs validation, changelog preparation, npm token synchronization, tag/push, workflow watch, and release verification in one flow.

@@ -6,7 +6,34 @@ category: Start
 summary: The fastest path from a fresh clone to a working CLI and local docs site.
 ---
 
-## Clone and install
+## Clone and initialize
+
+For a brand-new CLI, create the repository from the directory where the clone
+should be created:
+
+```bash
+gh repo create acme/pluck \
+  --public \
+  --template amxv/go-cli-template \
+  --clone
+```
+
+Then run setup from the new repository root:
+
+```bash
+cd pluck
+make setup SETUP_ARGS='--cli-name pluck --github-owner acme \
+  --github-repo pluck --npm-package @acme/pluck --license Apache-2.0'
+```
+
+The setup command runs from the repository root and never reclones. Omit
+`--public` in the GitHub command for the safe private default. Use public
+visibility for the normal anonymous npm installation path.
+
+For an existing clone, run `make setup` with the identity options shown in the
+customization guide. No manual `mycli` rename sweep is required.
+
+## Install dependencies
 
 Install Go, Node.js, and Bun, then install JavaScript dependencies:
 
@@ -41,18 +68,7 @@ Astro usually serves the site at `http://localhost:4321`.
 
 ## First customization pass
 
-For a new CLI, start by renaming the command everywhere:
-
-```bash
-cmd/mycli
-bin/mycli.js
-package.json
-.github/workflows/release.yml
-Makefile
-src/data/docs.ts
-```
-
-Then replace the starter command behavior in:
+Replace the starter command behavior in:
 
 ```bash
 internal/app/app.go

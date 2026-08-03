@@ -25,10 +25,10 @@ const proofPoints = [
 ];
 
 const workflows = [
-  "Clone the template, rename mycli to the command you want to ship, and replace the starter command handlers.",
+  "Create a repository from the template, then initialize the command, module, npm, release, and docs identity in one pass.",
   "Keep docs next to the CLI so every future command has a guide, reference page, and maintenance notes.",
   "Use make targets locally for formatting, tests, vetting, builds, and multi-platform release binaries.",
-  "Push v-prefixed tags when you are ready to publish native binaries and the npm wrapper package."
+  "Run make ship when the checks, changelog, tag, release workflow, assets, and npm publication are ready."
 ];
 ---
 
@@ -67,7 +67,7 @@ const workflows = [
         <span>$ make check</span>
         <span>$ make build</span>
         <span>$ bun run docs:dev</span>
-        <span>$ make release-tag VERSION=0.2.0</span>
+        <span>$ make ship VERSION=0.2.0</span>
       </div>
     </aside>
   </section>

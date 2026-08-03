@@ -9,6 +9,8 @@ env:
   GO_VERSION: "1.26"
   NODE_VERSION: "22"
   CLI_BINARY: "mycli"
+  CLI_ENTRYPOINT: "mycli"
+  CLI_MODULE: "github.com/amxv/go-cli-template"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -76,9 +78,10 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             EXT=".exe"
           fi
+          VERSION="${GITHUB_REF_NAME#v}"
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -trimpath -ldflags="-s -w" \
-            -o "dist/${{ env.CLI_BINARY }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}" ./cmd/${{ env.CLI_BINARY }}
+            go build -trimpath -ldflags="-s -w -X ${{ env.CLI_MODULE }}/internal/buildinfo.Version=${VERSION}" \
+            -o "dist/${{ env.CLI_BINARY }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}" ./cmd/${{ env.CLI_ENTRYPOINT }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

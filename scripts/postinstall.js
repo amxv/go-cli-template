@@ -6,7 +6,8 @@ const https = require("node:https");
 const { spawnSync } = require("node:child_process");
 
 const pkg = require("../package.json");
-const cliName = pkg.config?.cliBinaryName || "mycli";
+const cliName = pkg.config?.cliName || Object.keys(pkg.bin || {})[0] || "mycli";
+const binaryBaseName = pkg.config?.cliBinaryName || cliName;
 
 const repoURL = pkg.repository?.url || "";
 const repoMatch = repoURL.match(/github\.com[:/](.+?)\/(.+?)(?:\.git)?$/);
@@ -34,12 +35,13 @@ const goarch = goarchMap[process.arch];
 
 const rootDir = path.resolve(__dirname, "..");
 const binDir = path.join(rootDir, "bin");
-const binaryName = process.platform === "win32" ? `${cliName}.exe` : `${cliName}-bin`;
+const binaryName = process.platform === "win32" ? `${binaryBaseName}.exe` : `${binaryBaseName}-bin`;
 const destination = path.join(binDir, binaryName);
 
 function buildLdflags(version) {
   const resolvedVersion = `${version || ""}`.trim() || "dev";
-  return `-s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=${resolvedVersion}`;
+  const modulePath = pkg.config?.goModule || "github.com/amxv/go-cli-template";
+  return `-s -w -X ${modulePath}/internal/buildinfo.Version=${resolvedVersion}`;
 }
 
 async function main() {
@@ -52,7 +54,7 @@ async function main() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const version = pkg.version;
-  const assetName = `${cliName}_${goos}_${goarch}${goos === "windows" ? ".exe" : ""}`;
+  const assetName = `${binaryBaseName}_${goos}_${goarch}${goos === "windows" ? ".exe" : ""}`;
   const assetURL = `https://github.com/${repoOwner}/${repoName}/releases/download/v${version}/${assetName}`;
 
   try {
