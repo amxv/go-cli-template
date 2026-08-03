@@ -179,7 +179,7 @@ function warnForPrivateAnonymousInstall(options) {
   const anonymousNpm = optionValue(options, "anonymousNpm", "ANONYMOUS_NPM");
   if (visibility === "private" && [true, "1", "true", "yes"].includes(anonymousNpm)) {
     console.warn(
-      "Warning: anonymous npm installs cannot download release assets from a private GitHub repository. Use a public repo for the normal npm path, or arrange authenticated/bundled assets in go-cli-ship."
+      "Warning: anonymous npm installs cannot download release assets from a private GitHub repository. Use a public repo for the normal npm path, or arrange authenticated/bundled assets in bootstrap-go-cli."
     );
   }
 }
