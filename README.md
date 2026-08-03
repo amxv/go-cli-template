@@ -2,7 +2,7 @@
 
 Minimal template for shipping a Go CLI with:
 
-- one-command identity setup after GitHub template cloning
+- one-command identity bootstrap after GitHub template cloning
 - a local command runner (`Makefile`)
 - npm global install wrapper (`bin/mycli.js`)
 - automatic GitHub Release + npm publish on tag
@@ -52,11 +52,11 @@ gh repo create acme/pluck \
   --clone
 ```
 
-Then run the identity setup from the new repository root:
+Then run the identity bootstrap from the new repository root:
 
 ```bash
 cd pluck
-make setup SETUP_ARGS='--cli-name pluck \
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
   --binary-name pluck \
   --go-module github.com/acme/pluck \
   --github-owner acme --github-repo pluck \
@@ -65,16 +65,16 @@ make setup SETUP_ARGS='--cli-name pluck \
   --license Apache-2.0'
 ```
 
-The setup command runs from the cloned repository root and never creates or
+The bootstrap command runs from the cloned repository root and never creates or
 clones another repository. Omit `--public` in the GitHub command for the safe
 private default, while public repositories are the normal path for anonymous npm
 installs. If a private repo is intentionally paired with anonymous npm installs,
-pass `--visibility private --anonymous-npm` to the setup command for the warning.
+pass `--visibility private --anonymous-npm` to the bootstrap command for the warning.
 
-For any existing clone, `make setup` accepts the same identity options:
+For any existing clone, `make bootstrap` accepts the same identity options:
 
 ```bash
-make setup SETUP_ARGS='--cli-name pluck \
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
   --binary-name pluck \
   --go-module github.com/acme/pluck \
   --github-owner acme --github-repo pluck \
@@ -85,14 +85,16 @@ make setup SETUP_ARGS='--cli-name pluck \
   --license Apache-2.0'
 ```
 
-The setup script updates the command path, Go module, npm metadata, GitHub URLs,
+The bootstrap script updates the command path, Go module, npm metadata, GitHub URLs,
 Makefile, release workflow, postinstall metadata, docs configuration, and license
-references together. It uses `license-generator` for Apache-2.0 by default and
-supports the other license-generator names listed by `license-generator --list`.
+references together. Apache-2.0 is built in and does not require an extra CLI.
+Other license-generator names listed by `license-generator --list` are supported
+when that optional CLI is installed. Without it, bootstrap keeps the project on
+Apache-2.0 and prints a warning.
 
 ## Customize the CLI
 
-After setup, replace starter logic:
+After bootstrap, replace starter logic:
 
 - `internal/app/app.go`
 - `internal/app/app_test.go`
@@ -105,19 +107,23 @@ Update bundled docs as the command surface changes:
 
 ## Release flow
 
-The complete local release sequence is:
+Future releases are tag-driven. Edit `src/content/docs/changelog.md` manually,
+run the checks, commit and push the changelog, then push a `v*` tag:
 
 ```bash
-make ship VERSION=0.2.0
+make check
+bun run docs:check
+bun run docs:build
+# edit src/content/docs/changelog.md
+git add src/content/docs/changelog.md
+git commit -m "docs: update changelog for v0.2.0"
+git push origin HEAD
+make release-tag VERSION=0.2.0
 ```
 
-It runs `make check`, `bun run docs:check`, and `bun run docs:build` serially,
-updates the changelog, reads the npm token from the macOS keychain, syncs
-`NPM_TOKEN` to GitHub Actions, validates npm auth without printing the token,
-commits and pushes release metadata, tags and pushes `v0.2.0`, watches the release
-workflow, and verifies all six GitHub assets plus npm publication.
-
-Use the individual `release-*` Make targets when you need manual control.
+GitHub Actions builds the release binaries, creates the GitHub Release, and
+publishes npm. Configure the `NPM_TOKEN` GitHub secret once before the first
+release. No local token synchronization or release orchestration is required.
 
 ## Project layout
 
@@ -126,7 +132,7 @@ Use the individual `release-*` Make targets when you need manual control.
 - `internal/buildinfo/`: build-time version plumbing for `--version`
 - `scripts/postinstall.js`: installs binary from GitHub release (falls back to local `go build`)
 - `scripts/setup.js`: initializes the repeated project identity fields
-- `scripts/release.js`: runs the focused release workflow
+- `.agents/skills/release/SKILL.md`: manual changelog and tag release checklist
 - `.github/workflows/release.yml`: automated release pipeline
 - `project.config.json`: canonical project identity
 - `src/`: ZueDocs-powered documentation site

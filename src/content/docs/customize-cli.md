@@ -8,10 +8,10 @@ summary: The main checklist for turning mycli into a real Go command-line tool.
 
 ## Initialize identity
 
-Run one setup command before adding real behavior:
+Run one bootstrap command before adding real behavior:
 
 ```bash
-make setup SETUP_ARGS='--cli-name pluck \
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
   --binary-name pluck \
   --go-module github.com/acme/pluck \
   --github-owner acme --github-repo pluck \
@@ -28,7 +28,7 @@ CLI name and release binary name may be kept equal, or set independently.
 
 ## Update package identity
 
-The setup command updates package metadata before publishing:
+The bootstrap command updates package metadata before publishing:
 
 ```bash
 package.json name
@@ -71,6 +71,8 @@ bun run docs:build
 
 Run the docs commands serially. Astro can be sensitive to concurrent check/build work in the same repo.
 
-The default license is Apache-2.0. Pass `--license MIT` (or another value from
-`license-generator --list`) inside `SETUP_ARGS` to regenerate `LICENSE` and
-synchronize the metadata.
+The default license is Apache-2.0 and needs no extra CLI. Pass `--license MIT`
+(or another value from `license-generator --list`) inside `BOOTSTRAP_ARGS` to
+regenerate `LICENSE` and synchronize the metadata when the optional
+`license-generator` CLI is installed. Without it, bootstrap continues with
+Apache-2.0 and prints a warning.

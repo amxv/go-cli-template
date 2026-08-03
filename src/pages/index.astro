@@ -28,7 +28,7 @@ const workflows = [
   "Create a repository from the template, then initialize the command, module, npm, release, and docs identity in one pass.",
   "Keep docs next to the CLI so every future command has a guide, reference page, and maintenance notes.",
   "Use make targets locally for formatting, tests, vetting, builds, and multi-platform release binaries.",
-  "Run make ship when the checks, changelog, tag, release workflow, assets, and npm publication are ready."
+  "Edit the changelog, commit it, and push a version tag so GitHub Actions can publish the release."
 ];
 ---
 
@@ -67,7 +67,7 @@ const workflows = [
         <span>$ make check</span>
         <span>$ make build</span>
         <span>$ bun run docs:dev</span>
-        <span>$ make ship VERSION=0.2.0</span>
+        <span>$ make release-tag VERSION=0.2.0</span>
       </div>
     </aside>
   </section>
@@ -136,7 +136,7 @@ const workflows = [
       <p class="section-label">Docs map</p>
       <h2>Use the starter guides to customize the CLI and keep the docs site useful.</h2>
       <p>
-        The docs cover setup, command customization, release packaging, command reference,
+        The docs cover bootstrap, command customization, release packaging, command reference,
         and maintenance notes for the embedded ZueDocs site.
       </p>
     </div>

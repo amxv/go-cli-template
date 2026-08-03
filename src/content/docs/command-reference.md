@@ -31,16 +31,21 @@ make install-local
 make clean
 ```
 
-## Project setup and release
+## Project bootstrap and release
 
 ```bash
-make setup SETUP_ARGS='--cli-name pluck --github-owner acme --github-repo pluck'
-make ship VERSION=0.2.0
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --github-owner acme --github-repo pluck'
+make check
+bun run docs:check
+bun run docs:build
+# edit src/content/docs/changelog.md, then commit and push it
+make release-tag VERSION=0.2.0
 ```
 
-Use `make release-preflight`, `make release-changelog`, `make release-sync-token`,
-`make release-npm-auth`, `make release-tag`, `make release-watch`, and
-`make release-verify` when the release needs to be operated step by step.
+The bootstrap target updates the repeated project identity fields from the
+repository root. Releases are triggered by pushing a `v*` tag after the
+changelog has been edited and committed. GitHub Actions handles the release
+assets and npm publication.
 
 ## Docs development
 

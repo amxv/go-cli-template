@@ -10,13 +10,13 @@ BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
 LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
-.PHONY: help setup fmt test vet lint check docs-check docs-build build build-all install-local clean release-preflight release-changelog release-sync-token release-npm-auth release-tag release-watch release-verify ship
+.PHONY: help bootstrap fmt test vet lint check docs-check docs-build build build-all install-local clean release-tag
 
 help:
 	@echo "go-cli-template command runner"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make setup        - initialize CLI, module, repo, npm, docs, and license identity"
+	@echo "  make bootstrap    - initialize CLI, module, repo, npm, docs, and license identity"
 	@echo "  make fmt          - format Go files"
 	@echo "  make test         - run go test ./..."
 	@echo "  make vet          - run go vet ./..."
@@ -28,11 +28,10 @@ help:
 	@echo "  make build-all    - build release binaries for 6 target platforms"
 	@echo "  make install-local - install CLI to ~/.local/bin/mycli"
 	@echo "  make clean        - remove dist artifacts"
-	@echo "  make ship VERSION=x.y.z - check, update changelog, sync npm token, tag, watch, verify"
-	@echo "  make release-tag  - create and push git tag (low-level release step)"
+	@echo "  make release-tag VERSION=x.y.z - create and push a tag for GitHub Actions"
 
-setup:
-	@node scripts/setup.js $(SETUP_ARGS)
+bootstrap:
+	@node scripts/setup.js $(BOOTSTRAP_ARGS)
 
 fmt:
 	@$(GOFMT) -w $$(find . -type f -name '*.go' -not -path './dist/*')
@@ -77,26 +76,7 @@ install-local: build
 clean:
 	@rm -rf $(DIST_DIR)
 
-release-preflight:
-	@node scripts/release.js preflight
-
-release-changelog:
-	@VERSION="$(VERSION)" node scripts/release.js changelog
-
-release-sync-token:
-	@node scripts/release.js sync-token
-
-release-npm-auth:
-	@node scripts/release.js npm-auth
-
 release-tag:
-	@VERSION="$(VERSION)" node scripts/release.js tag
-
-release-watch:
-	@VERSION="$(VERSION)" node scripts/release.js watch
-
-release-verify:
-	@VERSION="$(VERSION)" node scripts/release.js verify
-
-ship:
-	@VERSION="$(VERSION)" node scripts/release.js ship
+	@test -n "$(VERSION)" || (echo "Usage: make release-tag VERSION=x.y.z" && exit 1)
+	@git tag "v$(VERSION)"
+	@git push origin "v$(VERSION)"

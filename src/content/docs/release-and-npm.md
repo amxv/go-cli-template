@@ -8,16 +8,23 @@ summary: How native binaries, GitHub releases, and npm publishing fit together.
 
 ## Release trigger
 
-The release workflow runs when a `v*` tag is pushed:
+The release workflow runs when a `v*` tag is pushed. Prepare the changelog and
+tag from the repository root:
 
 ```bash
-make ship VERSION=0.2.0
+make check
+bun run docs:check
+bun run docs:build
+# edit src/content/docs/changelog.md
+git add src/content/docs/changelog.md
+git commit -m "docs: update changelog for v0.2.0"
+git push origin HEAD
+make release-tag VERSION=0.2.0
 ```
 
-That checks the CLI and docs, updates and pushes the changelog, syncs the npm
-token, creates and pushes `v0.2.0`, watches the workflow, and verifies the
-release assets and npm publication. Use the individual `release-*` Make targets
-for manual control.
+The changelog is intentionally edited and reviewed by the agent or maintainer.
+`make release-tag` only creates and pushes the tag. GitHub Actions performs the
+release work after the tag arrives.
 
 ## What the workflow does
 
@@ -65,8 +72,9 @@ NPM_TOKEN
 Make sure the package name in `package.json` is available and publishable before tagging a release.
 
 The default package license is Apache-2.0 and is kept in sync with `LICENSE` and
-the setup metadata. Run `make setup SETUP_ARGS='--license MIT'` when a project
-needs a different supported license.
+the bootstrap metadata. Run `make bootstrap BOOTSTRAP_ARGS='--license MIT'` when a project
+needs a different supported license and has the optional `license-generator` CLI
+installed.
 
 ## Repository visibility
 

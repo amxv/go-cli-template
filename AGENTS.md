@@ -16,7 +16,6 @@ The sample command is `mycli`. Replace it with your actual CLI name and behavior
 - `bin/mycli.js`: npm shim that invokes packaged native binary.
 - `scripts/postinstall.js`: downloads release binary on install, falls back to `go build`.
 - `scripts/setup.js`: initializes command, module, repository, npm, docs, and license identity.
-- `scripts/release.js`: runs focused release checks, changelog, token, tag, watch, and verification steps.
 - `project.config.json`: canonical repeated project identity fields.
 - `.github/workflows/release.yml`: tag-driven release pipeline.
 - `src/`: ZueDocs-powered Astro documentation site for future CLIs.
@@ -33,8 +32,7 @@ Use `make` targets:
 - `make build`
 - `make build-all`
 - `make install-local`
-- `make setup SETUP_ARGS='...'`
-- `make ship VERSION=x.y.z`
+- `make bootstrap BOOTSTRAP_ARGS='...'`
 
 Direct commands:
 
@@ -46,8 +44,8 @@ Direct commands:
 
 ## How to customize safely
 
-1. Run `make setup` to rename the CLI command consistently.
-The setup script updates the command path, npm wrapper, package metadata, Go
+1. Run `make bootstrap` to rename the CLI command consistently.
+The bootstrap script updates the command path, npm wrapper, package metadata, Go
 module, Makefile, workflow, postinstall, docs config, and license metadata.
 
 2. Keep binary naming convention unchanged unless you also update postinstall/workflow:
@@ -72,7 +70,7 @@ module, Makefile, workflow, postinstall, docs config, and license metadata.
 
 Release pipeline triggers on `v*` tags and expects:
 
-- `NPM_TOKEN` GitHub secret present, synced by `make release-sync-token`.
+- `NPM_TOKEN` GitHub secret present before the first tag-driven release.
 - npm package name in `package.json` is publishable under your account/org.
 - repository URL matches the release origin used by `scripts/postinstall.js`.
 - public GitHub visibility is the normal anonymous npm install path.
@@ -90,4 +88,7 @@ This template includes:
 - `src/content/docs/changelog.md` as a placeholder changelog page for generated projects.
 - `.agents/skills/release/SKILL.md` as a release checklist that updates the changelog before tagging.
 
-When customizing the template for a real CLI, keep both files and update the placeholder changelog with the project's real version history. Use `make ship` to run checks, docs validation, changelog preparation, npm token synchronization, tag/push, workflow watch, and release verification in one flow.
+When customizing the template for a real CLI, keep both files and update the
+placeholder changelog manually before each release. Run the checks and docs
+validation, commit and push the changelog, then push a `v*` tag. GitHub Actions
+builds the release assets and publishes npm.

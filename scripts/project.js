@@ -103,7 +103,7 @@ function run(command, args, options = {}) {
 }
 
 function commandExists(command) {
-  const result = spawnSync("sh", ["-lc", `command -v ${command}`], {
+  const result = spawnSync("sh", ["-c", `command -v ${command}`], {
     cwd: rootDir,
     stdio: "ignore"
   });

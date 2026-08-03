@@ -18,19 +18,19 @@ gh repo create acme/pluck \
   --clone
 ```
 
-Then run setup from the new repository root:
+Then run bootstrap from the new repository root:
 
 ```bash
 cd pluck
-make setup SETUP_ARGS='--cli-name pluck --github-owner acme \
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --github-owner acme \
   --github-repo pluck --npm-package @acme/pluck --license Apache-2.0'
 ```
 
-The setup command runs from the repository root and never reclones. Omit
+The bootstrap command runs from the repository root and never reclones. Omit
 `--public` in the GitHub command for the safe private default. Use public
 visibility for the normal anonymous npm installation path.
 
-For an existing clone, run `make setup` with the identity options shown in the
+For an existing clone, run `make bootstrap` with the identity options shown in the
 customization guide. No manual `mycli` rename sweep is required.
 
 ## Install dependencies

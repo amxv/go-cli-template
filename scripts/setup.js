@@ -61,18 +61,17 @@ function main() {
   }
 
   const current = readProjectConfig();
-  const config = resolveConfig(current, options);
+  let config = resolveConfig(current, options);
   validateConfig(config);
   warnForPrivateAnonymousInstall(options);
   const explicitLicense = Boolean(optionValue(options, "license", "LICENSE"));
-  ensureLicenseGenerator(config, explicitLicense);
+  config = regenerateLicense(config, explicitLicense);
 
   renameStarterPaths(current, config);
   replaceIdentityReferences(current, config);
   updateBuildMetadata(config);
   updatePackageMetadata(config);
   updateReadmeLicense(config);
-  regenerateLicense(config, explicitLicense);
   writeProjectConfig(config);
 
   console.log(`Initialized ${config.cliName} for ${githubUrl(config)}.`);
@@ -336,6 +335,22 @@ function updateReadmeLicense(config) {
 }
 
 function regenerateLicense(config, explicitLicense) {
+  if (config.license === "Apache-2.0" && !explicitLicense) {
+    updateApacheLicenseNotice(config);
+    return config;
+  }
+
+  if (!commandExists("license-generator")) {
+    if (config.license !== "Apache-2.0") {
+      console.warn(
+        `Warning: license-generator is unavailable; continuing with Apache-2.0 instead of ${config.license}. Install license-generator to select another license.`
+      );
+      config = { ...config, license: "Apache-2.0" };
+    }
+    updateApacheLicenseNotice(config);
+    return config;
+  }
+
   const definition = licenseDefinitions[config.license];
   const author =
     process.env.LICENSE_AUTHOR ||
@@ -356,29 +371,42 @@ function regenerateLicense(config, explicitLicense) {
   ];
   const result = spawnSync("license-generator", args, {
     cwd: rootDir,
-    stdio: "inherit"
+    stdio: "inherit",
+    timeout: 10000
   });
 
   if (!result.error && result.status === 0) {
-    return;
-  }
-
-  if (explicitLicense || config.license !== "Apache-2.0") {
-    throw new Error(
-      "license-generator is required to select or regenerate a license. Install it and rerun make setup."
-    );
+    return config;
   }
 
   console.warn(
-    "Warning: license-generator is unavailable; retained the existing Apache LICENSE. Install license-generator to refresh its copyright notice."
+    `Warning: license-generator could not generate ${config.license}; continuing with Apache-2.0. Check the CLI output if you need a different license.`
   );
+  updateApacheLicenseNotice(config);
+  return {
+    ...config,
+    license: "Apache-2.0"
+  };
 }
 
-function ensureLicenseGenerator(config, explicitLicense) {
-  if ((explicitLicense || config.license !== "Apache-2.0") && !commandExists("license-generator")) {
-    throw new Error(
-      "license-generator is required to select or regenerate a license. Install it and rerun make setup."
-    );
+function updateApacheLicenseNotice(config) {
+  const licensePath = path.join(rootDir, "LICENSE");
+  if (!fs.existsSync(licensePath)) {
+    return;
+  }
+
+  const license = fs.readFileSync(licensePath, "utf8");
+  if (!/^\s*Apache License\s*$/m.test(license)) {
+    return;
+  }
+
+  const author = (process.env.LICENSE_AUTHOR || readGitConfig("user.name") || config.githubOwner)
+    .replace(/\s+/g, " ")
+    .trim();
+  const year = process.env.LICENSE_YEAR || String(new Date().getFullYear());
+  const updated = license.replace(/Copyright \d{4} .*$/m, `Copyright ${year} ${author}`);
+  if (updated !== license) {
+    fs.writeFileSync(licensePath, updated);
   }
 }
 
@@ -426,13 +454,13 @@ Options (also accepted as uppercase environment variables):
   --description TEXT       Package and repository description
   --homepage URL            npm and GitHub homepage
   --canonical-url URL       Astro canonical site URL
-  --license NAME            Apache-2.0 by default; supports license-generator names
+  --license NAME            Apache-2.0 by default; optional license-generator names
   --visibility private|public
                             Optional warning context for the already-created repo
   --anonymous-npm           Warn when private release assets would need anonymous downloads
 
 Example:
-  make setup SETUP_ARGS='--cli-name pluck --go-module github.com/acme/pluck \\
+  make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --go-module github.com/acme/pluck \\
     --github-owner acme --github-repo pluck --npm-package @acme/pluck \\
     --description "A fast file picker" --license Apache-2.0'
 `);
@@ -441,6 +469,6 @@ Example:
 try {
   main();
 } catch (error) {
-  console.error(`Setup failed: ${error.message}`);
+  console.error(`Bootstrap failed: ${error.message}`);
   process.exit(1);
 }
