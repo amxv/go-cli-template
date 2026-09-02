@@ -38,10 +38,11 @@ customization guide. No manual `mycli` rename sweep is required.
 Install Go, Node.js, and Bun, then install JavaScript dependencies:
 
 ```bash
-bun install
+make docs-install
 ```
 
-The repository uses Go for the CLI, Node for the npm wrapper, and Astro/ZueDocs for the docs site.
+The repository uses Go for the CLI, Node for the npm wrapper, and a self-contained
+Astro/ZueDocs workspace under `docs/` for the docs site.
 
 ## Run the starter CLI
 
@@ -61,7 +62,7 @@ The sample command is intentionally small so it is easy to replace.
 Run the embedded documentation site locally:
 
 ```bash
-bun run docs:dev
+make docs-dev
 ```
 
 Astro usually serves the site at `http://localhost:4321`.

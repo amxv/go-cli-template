@@ -40,14 +40,14 @@ make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --go-module github.com/acme/pluc
 
 ```bash
 make check
-bun run docs:check
-bun run docs:build
+make docs-check
+make docs-build
 ```
 
-2. Edit `src/content/docs/changelog.md` manually, then commit and push it:
+2. Edit `docs/src/content/docs/changelog.md` manually, then commit and push it:
 
 ```bash
-git add src/content/docs/changelog.md
+git add docs/src/content/docs/changelog.md
 git commit -m "docs: update changelog for v0.1.0"
 git push origin HEAD
 ```

@@ -36,9 +36,9 @@ make clean
 ```bash
 make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --github-owner acme --github-repo pluck'
 make check
-bun run docs:check
-bun run docs:build
-# edit src/content/docs/changelog.md, then commit and push it
+make docs-check
+make docs-build
+# edit docs/src/content/docs/changelog.md, then commit and push it
 make release-tag VERSION=0.2.0
 ```
 
@@ -50,10 +50,11 @@ assets and npm publication.
 ## Docs development
 
 ```bash
-bun run docs:dev
-bun run docs:check
-bun run docs:build
-bun run docs:preview
+make docs-install
+make docs-dev
+make docs-check
+make docs-build
+make docs-preview
 ```
 
 ## Main files
@@ -66,7 +67,7 @@ internal/buildinfo/buildinfo.go # version plumbing
 bin/mycli.js                  # npm executable shim
 scripts/postinstall.js        # release binary installer
 .github/workflows/release.yml # release workflow
-src/content/docs/*.md         # docs content
-src/data/docs.ts              # docs site config
+docs/src/content/docs/*.md    # docs content
+docs/src/data/docs.ts         # docs site config
 project.config.json           # canonical project identity
 ```

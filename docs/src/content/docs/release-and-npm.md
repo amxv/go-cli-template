@@ -13,10 +13,10 @@ tag from the repository root:
 
 ```bash
 make check
-bun run docs:check
-bun run docs:build
-# edit src/content/docs/changelog.md
-git add src/content/docs/changelog.md
+make docs-check
+make docs-build
+# edit docs/src/content/docs/changelog.md
+git add docs/src/content/docs/changelog.md
 git commit -m "docs: update changelog for v0.2.0"
 git push origin HEAD
 make release-tag VERSION=0.2.0

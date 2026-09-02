@@ -23,7 +23,7 @@ make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
 ```
 
 The script updates `cmd`, the npm wrapper, `package.json`, `go.mod`, `Makefile`,
-the release workflow, postinstall metadata, and `src/data/docs.ts` together. The
+the release workflow, postinstall metadata, and `docs/src/data/docs.ts` together. The
 CLI name and release binary name may be kept equal, or set independently.
 
 ## Update package identity
@@ -65,8 +65,8 @@ Run the full local check before pushing:
 
 ```bash
 make check
-bun run docs:check
-bun run docs:build
+make docs-check
+make docs-build
 ```
 
 Run the docs commands serially. Astro can be sensitive to concurrent check/build work in the same repo.

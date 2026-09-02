@@ -21,7 +21,7 @@ native binaries, creates the GitHub Release, and publishes npm.
 
 ## Changelog first
 
-Before tagging, manually update `src/content/docs/changelog.md`:
+Before tagging, manually update `docs/src/content/docs/changelog.md`:
 
 - prepend a section for the exact version being released
 - keep the newest version at the top
@@ -40,14 +40,14 @@ Run the checks serially from the repository root:
 
 ```bash
 make check
-bun run docs:check
-bun run docs:build
+make docs-check
+make docs-build
 ```
 
 Commit and push the changelog, then push the tag:
 
 ```bash
-git add src/content/docs/changelog.md
+git add docs/src/content/docs/changelog.md
 git commit -m "docs: update changelog for v${VERSION}"
 git push origin HEAD
 make release-tag VERSION=${VERSION}

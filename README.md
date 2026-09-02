@@ -29,17 +29,21 @@ mycli --version
 This template includes an Astro docs site powered by ZueDocs.
 
 ```bash
-bun install
-bun run docs:dev
-bun run docs:check
-bun run docs:build
+make docs-install
+make docs-dev
+make docs-check
+make docs-build
 ```
 
 Customize the docs alongside the CLI:
 
-- `src/data/docs.ts`: site name, repo URL, footer sections, nav, categories
-- `src/pages/index.astro`: landing page
-- `src/content/docs/*.md`: guides and command reference
+- `docs/src/data/docs.ts`: site name, repo URL, footer sections, nav, categories
+- `docs/src/pages/index.astro`: landing page
+- `docs/src/content/docs/*.md`: guides and command reference
+
+The docs app is self-contained under `docs/`, including its Bun dependencies,
+Astro config, public assets, and Vercel config. Configure Vercel with `docs` as
+the project Root Directory.
 
 ## Start a new CLI
 
@@ -101,21 +105,21 @@ After bootstrap, replace starter logic:
 
 Update bundled docs as the command surface changes:
 
-- `src/data/docs.ts`
-- `src/pages/index.astro`
-- `src/content/docs/*.md`
+- `docs/src/data/docs.ts`
+- `docs/src/pages/index.astro`
+- `docs/src/content/docs/*.md`
 
 ## Release flow
 
-Future releases are tag-driven. Edit `src/content/docs/changelog.md` manually,
+Future releases are tag-driven. Edit `docs/src/content/docs/changelog.md` manually,
 run the checks, commit and push the changelog, then push a `v*` tag:
 
 ```bash
 make check
-bun run docs:check
-bun run docs:build
-# edit src/content/docs/changelog.md
-git add src/content/docs/changelog.md
+make docs-check
+make docs-build
+# edit docs/src/content/docs/changelog.md
+git add docs/src/content/docs/changelog.md
 git commit -m "docs: update changelog for v0.2.0"
 git push origin HEAD
 make release-tag VERSION=0.2.0
@@ -135,8 +139,9 @@ release. No local token synchronization or release orchestration is required.
 - `.agents/skills/release/SKILL.md`: manual changelog and tag release checklist
 - `.github/workflows/release.yml`: automated release pipeline
 - `project.config.json`: canonical project identity
-- `src/`: ZueDocs-powered documentation site
-- `astro.config.mjs`: docs site build config
+- `docs/`: self-contained Astro/ZueDocs documentation workspace
+- `docs/src/`: documentation pages, content, styles, and site config
+- `docs/vercel.json`: docs deployment config; Vercel Root Directory should be `docs`
 - `AGENTS.md`: instructions for coding agents
 - `CONTRIBUTORS.md`: maintainer/release operations
 

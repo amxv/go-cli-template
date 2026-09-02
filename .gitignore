@@ -4,12 +4,15 @@
 /bin/*.exe
 
 # Node/npm
-node_modules/
+/node_modules/
+/docs/node_modules/
 *.tgz
 npm-debug.log*
 
 # macOS
 .DS_Store
 
-# Astro
-.astro/
+# Astro docs
+/docs/.astro/
+/docs/dist/
+/docs/.vercel/

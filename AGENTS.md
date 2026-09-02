@@ -18,7 +18,7 @@ The sample command is `mycli`. Replace it with your actual CLI name and behavior
 - `scripts/setup.js`: initializes command, module, repository, npm, docs, and license identity.
 - `project.config.json`: canonical repeated project identity fields.
 - `.github/workflows/release.yml`: tag-driven release pipeline.
-- `src/`: ZueDocs-powered Astro documentation site for future CLIs.
+- `docs/`: self-contained Astro/ZueDocs workspace with its own Bun lockfile and Vercel config.
 
 ## Local commands
 
@@ -39,8 +39,8 @@ Direct commands:
 - `go test ./...`
 - `go vet ./...`
 - `npm run lint`
-- `bun run docs:check`
-- `bun run docs:build`
+- `make docs-check`
+- `make docs-build`
 
 ## How to customize safely
 
@@ -57,14 +57,15 @@ module, Makefile, workflow, postinstall, docs config, and license metadata.
 4. Keep help output expressive and command-local (`<command> --help` should explain examples).
 
 5. Update the bundled docs site when command behavior changes:
-- `src/data/docs.ts` for site name, repo URL, nav, footer sections, and categories
-- `src/pages/index.astro` for landing-page product copy
-- `src/content/docs/*.md` for guides and command reference
+- `docs/src/data/docs.ts` for site name, repo URL, nav, footer sections, and categories
+- `docs/src/pages/index.astro` for landing-page product copy
+- `docs/src/content/docs/*.md` for guides and command reference
 
 6. ZueDocs consumer pattern:
 - import shared layouts from `zuedocs/layouts/*`
 - import shared behavior/styles from `zuedocs/docsEnhancements` and `zuedocs/styles.css`
 - keep repo-specific content/config local instead of forking shared shell files
+- keep all web tooling under `docs/`; Vercel should use `docs` as the Root Directory
 
 ## Release contract
 
@@ -79,13 +80,13 @@ Release pipeline triggers on `v*` tags and expects:
 
 - Prefer additive changes; do not break the release asset naming contract unintentionally.
 - If you change release artifacts or CLI binary name, update both workflow and postinstall script in the same PR.
-- Run docs validation serially (`bun run docs:check` then `bun run docs:build`); do not run Astro check/build concurrently in the same repo.
+- Run docs validation serially (`make docs-check` then `make docs-build`); do not run Astro check/build concurrently in the same repo.
 
 ## Changelog and Release Skill
 
 This template includes:
 
-- `src/content/docs/changelog.md` as a placeholder changelog page for generated projects.
+- `docs/src/content/docs/changelog.md` as a placeholder changelog page for generated projects.
 - `.agents/skills/release/SKILL.md` as a release checklist that updates the changelog before tagging.
 
 When customizing the template for a real CLI, keep both files and update the

@@ -10,7 +10,7 @@ BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
 LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
-.PHONY: help bootstrap fmt test vet lint check docs-check docs-build build build-all install-local clean release-tag
+.PHONY: help bootstrap fmt test vet lint check docs-install docs-dev docs-check docs-build docs-preview build build-all install-local clean release-tag
 
 help:
 	@echo "go-cli-template command runner"
@@ -22,8 +22,11 @@ help:
 	@echo "  make vet          - run go vet ./..."
 	@echo "  make lint         - run Node script checks"
 	@echo "  make check        - fmt + test + vet + lint"
+	@echo "  make docs-install  - install docs dependencies"
+	@echo "  make docs-dev      - run the Astro/ZueDocs dev server"
 	@echo "  make docs-check    - validate the Astro/ZueDocs site"
 	@echo "  make docs-build    - build the Astro/ZueDocs site"
+	@echo "  make docs-preview  - preview the built Astro/ZueDocs site"
 	@echo "  make build        - build local binary to dist/mycli"
 	@echo "  make build-all    - build release binaries for 6 target platforms"
 	@echo "  make install-local - install CLI to ~/.local/bin/mycli"
@@ -47,11 +50,20 @@ lint:
 
 check: fmt test vet lint
 
+docs-install:
+	@cd docs && bun install --frozen-lockfile
+
+docs-dev:
+	@cd docs && bun run dev
+
 docs-check:
-	@bun run docs:check
+	@cd docs && bun run check
 
 docs-build:
-	@bun run docs:build
+	@cd docs && bun run build
+
+docs-preview:
+	@cd docs && bun run preview
 
 build:
 	@mkdir -p $(DIST_DIR)
