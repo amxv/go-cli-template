@@ -1,32 +1,69 @@
-# go-cli-template
+# Go CLI Template
 
-Minimal template for shipping a Go CLI with:
+A Go-first starter for shipping a command-line application with tests, GitHub Releases, and an Astro/ZueDocs website. Bootstrap **one** distribution method, implement your CLI, and remove the one-time setup machinery when the project is ready.
 
-- one-command identity bootstrap after GitHub template cloning
-- a local command runner (`Makefile`)
-- npm global install wrapper (`bin/mycli.js`)
-- automatic GitHub Release + npm publish on tag
-- bundled ZueDocs-powered docs site
+The two release paths are intentionally separate:
 
-## Install (template example)
+| | npm | Direct |
+| --- | --- | --- |
+| Install | `npm install -g @owner/cli` | Website-hosted shell/PowerShell installers |
+| GitHub Releases | Native binaries | Native binaries plus `SHA256SUMS` |
+| Publishing | GitHub Actions publishes to npm | GitHub Actions publishes release assets only |
+| Native `upgrade` command | No | `upgrade [--check]` |
+| Optional daily auto-updates | No | `auto-update on\|off\|status` |
+| npm token required | Yes | No |
+
+**npm is the default** if `--distribution` is omitted. Choose the distribution mode when bootstrapping; changing it later requires a fresh template rather than mixing the two paths.
+
+## Create a project
+
+Create a public GitHub repository from this template and clone it into your projects directory:
 
 ```bash
-npm i -g @amxv/go-cli-template
-mycli --help
+gh repo create acme/pluck --public --template amxv/go-cli-template --clone
+cd pluck
 ```
 
-## Commands in this starter
+Bootstrap a CLI distributed through **npm**:
 
 ```bash
-mycli --help
-mycli hello
-mycli hello <name>
-mycli --version
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
+  --distribution npm \
+  --npm-package @acme/pluck \
+  --description "A fast file picker" \
+  --license Apache-2.0'
 ```
 
-## Docs site
+Or bootstrap a **direct-install CLI** without npm:
 
-This template includes an Astro docs site powered by ZueDocs.
+```bash
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
+  --distribution direct \
+  --description "A fast file picker" \
+  --homepage https://pluck.example.com \
+  --canonical-url https://pluck.example.com \
+  --license Apache-2.0'
+```
+
+When cloning from the GitHub template, bootstrap normally infers the owner, repository, and Go module from `origin`. Override them with `--github-owner`, `--github-repo`, and `--go-module` when needed. `--binary-name` is available if the release asset name differs from the command name. The `--npm-package` option applies **only** to npm distribution.
+
+Bootstrap updates the command entrypoint, `go.mod`, Go imports, version/build metadata, release workflow, package or installer configuration, Astro canonical URL, and identity fields in `docs/src/data/docs.ts`. Apache-2.0 is the default; other supported licenses may use `license-generator`.
+
+**Bootstrap does not write product copy.** The agent building the new project should replace the sample command and author its README, landing page, and documentation pages. It should not blindly search-and-replace the starter prose.
+
+## Develop and validate
+
+The template starts with a deliberately small `mycli hello` command. After bootstrap, the generated command name replaces `mycli`.
+
+```bash
+make check            # Go tests, vet, formatting; Node checks in npm mode
+make build            # Native binary in dist/
+./dist/pluck --help   # After bootstrapping the example above
+```
+
+Application behavior belongs in `cmd/<cli>/` and `internal/app/`, with tests alongside it. `internal/buildinfo/` supplies the version injected by release builds. The normal Make targets remain available after bootstrap cleanup.
+
+The docs application is independent of the root npm package, so even a direct-distribution project can use Bun/Astro without publishing anything to npm:
 
 ```bash
 make docs-install
@@ -35,117 +72,62 @@ make docs-check
 make docs-build
 ```
 
-Customize the docs alongside the CLI:
+Host the site on Vercel with **Root Directory `docs`**. `docs/src/data/docs.ts` receives generated name, description, repository, and footer identity; navigation, colors, and actual page content are the project's responsibility.
 
-- `docs/src/data/docs.ts`: site name, repo URL, footer sections, nav, categories
-- `docs/src/pages/index.astro`: landing page
-- `docs/src/content/docs/*.md`: guides and command reference
+## Direct installation and upgrades
 
-The docs app is self-contained under `docs/`, including its Bun dependencies,
-Astro config, public assets, and Vercel config. Configure Vercel with `docs` as
-the project Root Directory.
-
-## Start a new CLI
-
-Create the repository from the directory where the new clone should be placed:
+Direct bootstrap includes `docs/public/install.sh` and `docs/public/install.ps1`, served at the website root once deployed. After publishing a first GitHub Release, users can install with, for example:
 
 ```bash
-gh repo create acme/pluck \
-  --public \
-  --template amxv/go-cli-template \
-  --clone
+curl -fsSL https://pluck.example.com/install.sh | sh
 ```
 
-Then run the identity bootstrap from the new repository root:
+On Windows, use the PowerShell installer at `https://pluck.example.com/install.ps1`.
+
+Direct releases contain binaries for macOS, Linux, and Windows (AMD64 and ARM64) and a `SHA256SUMS` file. The installers verify the checksum before replacing a binary. The generated native CLI also supports:
 
 ```bash
-cd pluck
-make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
-  --binary-name pluck \
-  --go-module github.com/acme/pluck \
-  --github-owner acme --github-repo pluck \
-  --npm-package @acme/pluck \
-  --description "A fast file picker" \
-  --license Apache-2.0'
+pluck upgrade --check
+pluck upgrade
+pluck auto-update on
+pluck auto-update status
+pluck auto-update off
 ```
 
-The bootstrap command runs from the cloned repository root and never creates or
-clones another repository. Omit `--public` in the GitHub command for the safe
-private default, while public repositories are the normal path for anonymous npm
-installs. If a private repo is intentionally paired with anonymous npm installs,
-pass `--visibility private --anonymous-npm` to the bootstrap command for the warning.
+Automatic updates are **off until the user opts in**. Enabling them creates a daily user-level OS job: launchd on macOS, a systemd user timer on Linux, or Task Scheduler on Windows. The CLI does not need to remain open. Scheduled checks compare the installed version with the latest stable GitHub Release and skip redundant installations. Checks are limited to once per 24 hours; failures do not revoke the user's preference or trigger a tight retry loop.
 
-For any existing clone, `make bootstrap` accepts the same identity options:
+The site must be deployed at the supplied canonical URL before the upgrade command can retrieve its installer. Linux scheduling needs a working systemd user manager; individual CLIs with running services may need additional product-specific safeguards before replacing their binary.
+
+## npm distribution
+
+npm bootstrap instead keeps `package.json`, the JavaScript command shim, and `scripts/postinstall.js`. The release workflow uploads native binaries to GitHub Releases and then publishes the npm package. The postinstall script downloads the matching release asset, with a local Go build fallback.
+
+Set the repository's **`NPM_TOKEN` GitHub Actions secret** securely before pushing the first release tag. Direct-distribution projects do not need that secret, npm publishing jobs, or a root `package.json`.
+
+## Finish setup and remove Bootstrap
+
+Once the project's identity, website URL, distribution choice, and release configuration are final, remove the temporary setup machinery:
 
 ```bash
-make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
-  --binary-name pluck \
-  --go-module github.com/acme/pluck \
-  --github-owner acme --github-repo pluck \
-  --npm-package @acme/pluck \
-  --description "A fast file picker" \
-  --homepage https://pluck.dev \
-  --canonical-url https://pluck.dev \
-  --license Apache-2.0'
+make bootstrap-clean
+make check
 ```
 
-The bootstrap script updates the command path, Go module, npm metadata, GitHub URLs,
-Makefile, release workflow, postinstall metadata, docs configuration, and license
-references together. Apache-2.0 is built in and does not require an extra CLI.
-Other license-generator names listed by `license-generator --list` are supported
-when that optional CLI is installed. Without it, bootstrap keeps the project on
-Apache-2.0 and prints a warning.
+This removes `scripts/setup.js`, `scripts/project.js`, Bootstrap regression fixtures, distribution templates, `project.config.json`, and the Bootstrap Make targets. It **keeps** application source, tests, docs, release workflows, and whichever installer or npm runtime files the selected distribution mode needs. Cleanup is a one-time operation; make any final Bootstrap identity adjustments first.
 
-## Customize the CLI
+## Release
 
-After bootstrap, replace starter logic:
-
-- `internal/app/app.go`
-- `internal/app/app_test.go`
-
-Update bundled docs as the command surface changes:
-
-- `docs/src/data/docs.ts`
-- `docs/src/pages/index.astro`
-- `docs/src/content/docs/*.md`
-
-## Release flow
-
-Future releases are tag-driven. Edit `docs/src/content/docs/changelog.md` manually,
-run the checks, commit and push the changelog, then push a `v*` tag:
+Both methods publish on a pushed `v*` Git tag. Write the release notes in `docs/src/content/docs/changelog.md`, validate the app and docs, commit and push, then tag the intended version:
 
 ```bash
 make check
 make docs-check
 make docs-build
-# edit docs/src/content/docs/changelog.md
-git add docs/src/content/docs/changelog.md
-git commit -m "docs: update changelog for v0.2.0"
-git push origin HEAD
+# Edit and commit docs/src/content/docs/changelog.md, then push main.
 make release-tag VERSION=0.2.0
 ```
 
-GitHub Actions builds the release binaries, creates the GitHub Release, and
-publishes npm. Configure the `NPM_TOKEN` GitHub secret once before the first
-release. No local token synchronization or release orchestration is required.
-
-## Project layout
-
-- `cmd/mycli/main.go`: CLI entrypoint
-- `internal/app/`: command logic
-- `internal/buildinfo/`: build-time version plumbing for `--version`
-- `scripts/postinstall.js`: installs binary from GitHub release (falls back to local `go build`)
-- `scripts/setup.js`: initializes the repeated project identity fields
-- `.agents/skills/release/SKILL.md`: manual changelog and tag release checklist
-- `.github/workflows/release.yml`: automated release pipeline
-- `project.config.json`: canonical project identity
-- `docs/`: self-contained Astro/ZueDocs documentation workspace
-- `docs/src/`: documentation pages, content, styles, and site config
-- `docs/vercel.json`: docs deployment config; Vercel Root Directory should be `docs`
-- `AGENTS.md`: instructions for coding agents
-- `CONTRIBUTORS.md`: maintainer/release operations
-
-See `AGENTS.md` and `CONTRIBUTORS.md` for complete dev/release instructions.
+GitHub Actions builds and publishes the configured artifacts. It also publishes to npm **only** for npm-mode projects. The repository-local [release skill](.agents/skills/release/SKILL.md) covers the complete release procedure; `AGENTS.md` and `CONTRIBUTORS.md` cover project development and maintenance.
 
 ## License
 
