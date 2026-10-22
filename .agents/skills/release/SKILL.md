@@ -49,12 +49,12 @@ other changes.
 
 ## Validate and tag
 
-Run the checks serially from the repository root:
+Run the checks from the repository root. Astro's check is sufficient for local
+documentation validation; the deployment platform performs the production build:
 
 ```bash
 make check
 make docs-check
-make docs-build
 ```
 
 Commit and push the changelog, then push the tag:

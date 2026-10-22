@@ -51,20 +51,25 @@ Local repos should keep their own docs content and `docs/src/data/docs.ts`, whil
 Run:
 
 ```bash
+make docs-test
 make docs-check
-make docs-build
 ```
 
-Run these commands serially. Do not run Astro check and build concurrently in the same repo.
+Astro check is sufficient for local validation. No separate production build is
+needed when editing the docs; Vercel handles that during deployment.
 
 ## Deployment
 
-The docs site builds to static output in `docs/dist`:
-
-```bash
-make docs-build
-```
+Vercel builds the docs site to static output in `docs/dist` during deployment.
 
 For Vercel, use `docs` as the Root Directory. The committed `docs/vercel.json`
 installs and builds the isolated docs workspace and serves `docs/dist` without
 sharing the Go CLI's root `dist/` directory.
+
+The site also comes with `docs/scripts/should-build.mjs`, configured as Vercel's
+Ignored Build Step. It builds on `main` when `docs/` changed (including website
+installers), but skips Astro builds for code-only commits. It handles multi-commit
+pushes and fails open if Vercel's shallow Git checkout cannot resolve the base.
+Run `make docs-test` before deploying. **Ignored/canceled Vercel builds still
+count toward deployment limits**; true zero-quota skipping requires an eligible
+workspace or a docs-path-filtered GitHub Actions deploy instead of Git auto-deploy.

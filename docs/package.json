@@ -8,7 +8,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "test:vercel": "node --test scripts/should-build.test.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",

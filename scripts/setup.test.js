@@ -119,6 +119,8 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   }
   run(checkout, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true,
+    "cleanup must retain Vercel's production affected-path filter");
   assert.equal(fs.existsSync(path.join(checkout, "scripts/direct-templates/menubar")), false);
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), true);
@@ -278,6 +280,7 @@ exit 0
   assert.match(invalid.stderr, /usage: spark upgrade/);
   run(checkout, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true);
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);
   assert.equal(fs.existsSync(path.join(checkout, "internal/upgrade/upgrade.go")), true);

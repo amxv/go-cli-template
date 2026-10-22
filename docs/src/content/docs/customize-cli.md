@@ -66,10 +66,9 @@ Run the full local check before pushing:
 ```bash
 make check
 make docs-check
-make docs-build
 ```
 
-Run the docs commands serially. Astro can be sensitive to concurrent check/build work in the same repo.
+Astro check is sufficient for routine docs validation; Vercel builds the site for deployment.
 
 The default license is Apache-2.0 and needs no extra CLI. Pass `--license MIT`
 (or another value from `license-generator --list`) inside `BOOTSTRAP_ARGS` to

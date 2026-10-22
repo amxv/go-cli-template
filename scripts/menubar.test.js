@@ -128,6 +128,7 @@ test("opt-in menu bar builds, installs, verifies and survives bootstrap cleanup"
 
   run(fixture, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(fixture, "scripts/direct-templates/menubar")), false);
+  assert.equal(fs.existsSync(path.join(fixture, "docs/scripts/should-build.mjs")), true);
   assert.equal(fs.existsSync(path.join(fixture, "apps/menubar/Sources/main.swift")), true);
   assert.equal(fs.existsSync(path.join(fixture, "docs/public/install.sh")), true);
   run(fixture, "go", ["test", "./..."]);

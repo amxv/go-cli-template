@@ -37,7 +37,6 @@ make clean
 make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --github-owner acme --github-repo pluck'
 make check
 make docs-check
-make docs-build
 # edit docs/src/content/docs/changelog.md, then commit and push it
 make release-tag VERSION=0.2.0
 ```
@@ -53,8 +52,6 @@ assets and npm publication.
 make docs-install
 make docs-dev
 make docs-check
-make docs-build
-make docs-preview
 ```
 
 ## Main files

@@ -68,11 +68,33 @@ The docs application is independent of the root npm package, so even a direct-di
 ```bash
 make docs-install
 make docs-dev
+make docs-test
 make docs-check
-make docs-build
 ```
 
 Host the site on Vercel with **Root Directory `docs`**. `docs/src/data/docs.ts` receives generated name, description, repository, and footer identity; navigation, colors, and actual page content are the project's responsibility.
+
+### Automatic docs deployments
+
+The template already includes a tested **`docs/scripts/should-build.mjs`** and
+**`docs/vercel.json`** wired with `ignoreCommand`. Link the Vercel project to
+GitHub, set its Root Directory to `docs`, and keep production Git deployments
+enabled for `main`. Preview branches are disabled by default through
+`git.deploymentEnabled`.
+
+- A push that changes only Go source, root release metadata, or the optional
+  Swift menu bar code skips the Astro build.
+- Any change under `docs/`, including `docs/public/install.sh` or
+  `docs/public/install.ps1`, builds and deploys the site.
+- The first build or an inconclusive Git diff builds rather than accidentally
+  skipping a real documentation change.
+
+Run `make docs-test` to exercise the change detection against isolated Git
+repositories. **Vercel's Ignored Build Step cancels unnecessary builds, but
+the resulting canceled deployment still counts toward deployment quotas.**
+For a strict per-day deployment limit, use a path-scoped GitHub Actions deploy
+instead of automatic Git deploys, or Vercel's native skip-unaffected-projects
+feature when the repository meets its JavaScript workspace requirements.
 
 ## Direct installation and upgrades
 
@@ -149,7 +171,6 @@ Both methods publish on a pushed `v*` Git tag. Write the release notes in `docs/
 ```bash
 make check
 make docs-check
-make docs-build
 # Edit and commit docs/src/content/docs/changelog.md, then push main.
 make release-tag VERSION=0.2.0
 ```

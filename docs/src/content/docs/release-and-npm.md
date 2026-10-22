@@ -14,7 +14,6 @@ tag from the repository root:
 ```bash
 make check
 make docs-check
-make docs-build
 # edit docs/src/content/docs/changelog.md
 git add docs/src/content/docs/changelog.md
 git commit -m "docs: update changelog for v0.2.0"

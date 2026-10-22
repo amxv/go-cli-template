@@ -43,7 +43,7 @@ Direct commands:
 - `go vet ./...`
 - `npm run lint`
 - `make docs-check`
-- `make docs-build`
+- `make docs-test` (Vercel affected-path and production-branch regression tests)
 
 ## How to customize safely
 
@@ -82,6 +82,15 @@ and docs files intact.
 - keep repo-specific content/config local instead of forking shared shell files
 - keep all web tooling under `docs/`; Vercel should use `docs` as the Root Directory
 
+The docs site's committed `docs/vercel.json` enables automatic Git deployments
+on `main` only and invokes `node scripts/should-build.mjs` as an Ignored Build
+Step. That testable script compares commit ranges from the repository root and
+ignores Go/Swift-only pushes while building for any `docs/` change. Check
+`make docs-test` before deploying a scaffold. Missing commit history fails
+open. **Ignored builds still count as canceled deployments toward Vercel's
+deployment limits**; for strict limits use a path-filtered GitHub Actions
+deploy, with Git auto deploys turned off, rather than claiming zero quota use.
+
 ## Optional macOS menu bar scaffold
 
 Only direct-distribution Bootstrap accepts **--macos-menubar**. When selected,
@@ -112,7 +121,7 @@ Release pipeline triggers on `v*` tags and expects:
 
 - Prefer additive changes; do not break the release asset naming contract unintentionally.
 - If you change release artifacts or CLI binary name, update both workflow and postinstall script in the same PR.
-- Run docs validation serially (`make docs-check` then `make docs-build`); do not run Astro check/build concurrently in the same repo.
+- Use `make docs-check` for routine Astro validation; do not run a separate docs production build locally. Vercel handles production builds.
 
 ## Changelog and Release Skill
 

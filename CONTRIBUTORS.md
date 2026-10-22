@@ -36,12 +36,11 @@ make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --go-module github.com/acme/pluc
 
 ## Release process
 
-1. Ensure `main` is green and the docs pass serially:
+1. Ensure `main` is green and Astro checks pass:
 
 ```bash
 make check
 make docs-check
-make docs-build
 ```
 
 2. Edit `docs/src/content/docs/changelog.md` manually, then commit and push it:

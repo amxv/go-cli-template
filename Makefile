@@ -10,7 +10,7 @@ BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
 LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
-.PHONY: help bootstrap bootstrap-clean fmt test vet lint check docs-install docs-dev docs-check docs-build docs-preview build build-all install-local clean release-tag
+.PHONY: help bootstrap bootstrap-clean fmt test vet lint check docs-install docs-dev docs-test docs-check docs-build docs-preview build build-all install-local clean release-tag
 
 help:
 	@echo "go-cli-template command runner"
@@ -25,6 +25,7 @@ help:
 	@echo "  make check        - fmt + test + vet + lint"
 	@echo "  make docs-install  - install docs dependencies"
 	@echo "  make docs-dev      - run the Astro/ZueDocs dev server"
+	@echo "  make docs-test     - test Vercel affected-path deployment filtering"
 	@echo "  make docs-check    - validate the Astro/ZueDocs site"
 	@echo "  make docs-build    - build the Astro/ZueDocs site"
 	@echo "  make docs-preview  - preview the built Astro/ZueDocs site"
@@ -59,6 +60,9 @@ docs-install:
 
 docs-dev:
 	@cd docs && bun run dev
+
+docs-test:
+	@cd docs && bun run test:vercel
 
 docs-check:
 	@cd docs && bun run check
