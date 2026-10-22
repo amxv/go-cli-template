@@ -10,7 +10,7 @@ BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
 LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
-.PHONY: help bootstrap bootstrap-clean fmt test vet lint check docs-install docs-dev docs-test docs-check docs-build docs-preview build build-all install-local clean release-tag
+.PHONY: help bootstrap bootstrap-clean vercel-provision fmt test vet lint check docs-install docs-dev docs-test docs-check docs-build docs-preview build build-all install-local clean release-tag
 
 help:
 	@echo "go-cli-template command runner"
@@ -18,6 +18,7 @@ help:
 	@echo "Targets:"
 	@echo "  make bootstrap    - initialize CLI, module, repo, npm, docs, and license identity"
 	@echo "  make bootstrap-clean - retire one-time bootstrap machinery after setup"
+	@echo "  make vercel-provision - securely mint a project-scoped Vercel CI token"
 	@echo "  make fmt          - format Go files"
 	@echo "  make test         - run go test ./..."
 	@echo "  make vet          - run go vet ./..."
@@ -40,6 +41,9 @@ bootstrap:
 
 bootstrap-clean:
 	@node scripts/cleanup.js
+
+vercel-provision:
+	@node scripts/provision-vercel.mjs
 
 fmt:
 	@$(GOFMT) -w $$(find . -type f -name '*.go' -not -path './dist/*')

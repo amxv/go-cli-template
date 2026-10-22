@@ -74,8 +74,14 @@ Vercel CLI. The project remains connected to GitHub, but
 automatic Git deployments. Do not add `ignoreCommand`: canceled deployments
 still count toward Vercel's deployment quota.
 
-Before the first generated-project deployment, configure the repository's
-GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`
-from a Vercel-linked `docs/` directory. `make docs-test` validates the GitHub
+Before the first generated-project deployment, run `make vercel-provision`
+from the repository root after linking `docs/` to Vercel and before running
+`make bootstrap-clean`. The script mints a project-scoped CI token from the
+protected Vercel CLI session (or a macOS Keychain fallback), writes
+`VERCEL_TOKEN` as a GitHub Actions secret, and saves `VERCEL_ORG_ID` and
+`VERCEL_PROJECT_ID` as GitHub Actions variables. GitHub CI produces a
+Vercel Build Output API v3 static bundle and deploys with `--prebuilt` so
+project-scoped tokens do not require Vercel's broad project-settings calls.
+Agents only use `make docs-check` locally. `make docs-test` validates the GitHub
 path trigger and the retained, independent Git diff helper
 `docs/scripts/should-build.mjs`. The helper is **not** run by Vercel itself.

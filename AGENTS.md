@@ -88,9 +88,15 @@ Astro check and deploys to Vercel only after a docs change. Root code and Swift
 app changes create no Vercel deployment/quota entry. Keep the Vercel project's
 GitHub connection and Root Directory `docs`, but preserve
 `git.deploymentEnabled: false` in `docs/vercel.json`, with no `ignoreCommand`
-(which cancels *after* creating a counted deployment). Setup requires the
-generated project's GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
-and `VERCEL_PROJECT_ID` from the linked docs project; never commit them.
+(which cancels *after* creating a counted deployment). After linking `docs/`
+to Vercel, run `make vercel-provision` **before** `make bootstrap-clean`.
+It uses the existing Vercel CLI credential (with macOS Keychain fallback) to
+mint a project-scoped token. GitHub stores only `VERCEL_TOKEN` as an Actions
+**secret**; `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` are Actions **variables**.
+Never print or commit tokens, or provision the canonical source template.
+The GitHub Docs workflow builds static Astro output in CI and deploys with
+`--prebuilt`, so project-scoped tokens need not fetch broad Vercel settings.
+Agents still use `make docs-check` for local validation.
 `docs/scripts/should-build.mjs` remains a tested local helper only. Check
 `make docs-test` before deploying a scaffold. Do not re-enable Vercel Git
 auto-deploys or introduce duplicate deployment triggers.

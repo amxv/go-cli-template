@@ -18,8 +18,10 @@ function main() {
     throw new Error("Could not find the expected bootstrap/cleanup recipes in Makefile.");
   }
   let makefile = oldMakefile.replace(recipe, "");
-  makefile = makefile.replace(/ bootstrap bootstrap-clean /, " ");
+  makefile = makefile.replace(/^vercel-provision:\n\t@node scripts\/provision-vercel\.mjs\n\n/m, "");
+  makefile = makefile.replace(/ bootstrap bootstrap-clean vercel-provision /, " ");
   makefile = makefile.replace(/^\t@echo "  make bootstrap.*\n/gm, "");
+  makefile = makefile.replace(/^\t@echo "  make vercel-provision.*\n/gm, "");
   fs.writeFileSync(makefilePath, makefile);
 
   if (config.distribution === "npm") {
@@ -33,6 +35,7 @@ function main() {
   const removable = [
     "project.config.json", "scripts/project.js", "scripts/setup.js", "scripts/setup.test.js",
     "scripts/menubar.test.js",
+    "scripts/provision-vercel.mjs", "scripts/provision-vercel.test.mjs",
     "scripts/cleanup.js"
   ];
   for (const relative of removable) fs.rmSync(path.join(rootDir, relative), { force: true });

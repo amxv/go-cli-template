@@ -119,6 +119,7 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   }
   run(checkout, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/provision-vercel.mjs")), false);
   assert.equal(JSON.parse(read(checkout, "docs/vercel.json")).git.deploymentEnabled, false);
   assert.match(read(checkout, ".github/workflows/docs.yml"), /docs\/\*\*/);
   assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true,
@@ -127,6 +128,7 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), true);
   assert.doesNotMatch(read(checkout, "Makefile"), /^bootstrap:/m);
+  assert.doesNotMatch(read(checkout, "Makefile"), /^vercel-provision:/m);
   run(checkout, "npm", ["test"]);
   run(checkout, "go", ["test", "./..."]);
 });
@@ -282,6 +284,7 @@ exit 0
   assert.match(invalid.stderr, /usage: spark upgrade/);
   run(checkout, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/provision-vercel.mjs")), false);
   assert.equal(JSON.parse(read(checkout, "docs/vercel.json")).git.deploymentEnabled, false);
   assert.match(read(checkout, ".github/workflows/docs.yml"), /docs\/\*\*/);
   assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true);

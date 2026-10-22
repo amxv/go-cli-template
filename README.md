@@ -77,8 +77,10 @@ Host the site on Vercel with **Root Directory `docs`**. `docs/src/data/docs.ts` 
 ### Automatic docs deployments
 
 **Quota-safe by default:** `.github/workflows/docs.yml` triggers on `main` only
-when a file under `docs/` changes. It validates the Astro site and calls the
-Vercel CLI to create a production deployment. Go source, root release metadata,
+when a file under `docs/` changes. It validates the Astro site, builds static
+output in GitHub CI, and deploys through Vercel's Build Output API v3 with
+`vercel deploy --prebuilt`. This avoids broad project-settings queries that
+can fail with project-scoped tokens. Go source, root release metadata,
 and optional Swift menu bar changes **do not start a docs deployment at all**.
 Pull requests can run docs checks without deploying. You can request an explicit
 production redeployment using the workflow's manual trigger.
@@ -90,14 +92,28 @@ The build and install commands remain configured for the real docs deployments.
 Do **not** add Vercel's `ignoreCommand`: that cancels a deployment after it is
 created and **still counts against deployment quotas**.
 
-During the one-time Vercel setup, add these three GitHub Actions secrets to
-the **generated project's** repository:
+Provision credentials **once per new project**, after linking `docs/` to its
+Vercel project and authenticating with `gh`:
 
-- `VERCEL_TOKEN`: a Vercel account access token (keep it private).
-- `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`: the IDs from `docs/.vercel/project.json`
-  after running `vercel link` inside `docs/`.
+```bash
+cd docs && vercel link --yes && cd ..
+make vercel-provision
+```
 
-The Actions job fails with a clear error if any are missing. Template-source
+This reads the linked `docs/.vercel/project.json`, tries your existing Vercel
+CLI session, and uses Vercel's API to mint a **project-scoped token**. It puts
+`VERCEL_TOKEN` in GitHub Actions **secrets** and the non-secret
+`VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` in GitHub Actions **variables**, without
+printing or committing credentials. An existing deployment token is preserved;
+run `node scripts/provision-vercel.mjs --rotate` to replace it before cleanup.
+Revoke the previous token separately in Vercel account settings afterward.
+If CLI authentication cannot mint tokens, the setup script falls back to an
+account-scoped provisioning credential in your local macOS Keychain under the
+service name `amxv vercel bootstrap token`. The high-privilege credential never
+goes to GitHub; each project gets its own restricted deployment token. Agents
+only need `make docs-check` locally; Astro's production build runs in CI.
+
+The Actions job fails with a clear error if credentials are missing. Template-source
 repositories skip the deployment step. `make docs-test` validates the path
 decision and deployment configuration with isolated Git fixtures; the retained
 `docs/scripts/should-build.mjs` is a **test helper**, not a Vercel ignored-build
