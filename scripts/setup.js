@@ -71,13 +71,15 @@ function main() {
   replaceIdentityReferences(current, config);
   updateBuildMetadata(config);
   updatePackageMetadata(config);
-  updateReadmeLicense(config);
+  updateDocsMetadata(config);
+  updateDocsCanonicalUrl(config);
   writeProjectConfig(config);
 
   console.log(`Initialized ${config.cliName} for ${githubUrl(config)}.`);
   console.log(`Go module: ${config.goModule}`);
   console.log(`npm package: ${config.npmPackage}`);
   console.log(`License: ${config.license}`);
+  console.log("Update README.md and docs pages separately with project-specific content.");
 }
 
 function resolveConfig(current, options) {
@@ -272,7 +274,10 @@ function updateBuildMetadata(config) {
 function collectTextFiles(directory) {
   const files = [];
   const ignoredDirectories = new Set([".git", ".astro", "dist", "node_modules", "scripts"]);
-  const textExtensions = new Set([".astro", ".go", ".js", ".json", ".lock", ".md", ".mjs", ".ts", ".yml"]);
+  // Keep prose/docs pages untouched. Bootstrap owns source and machine metadata only.
+  const textExtensions = new Set([".go", ".mod", ".js", ".json", ".lock", ".mjs", ".ts", ".yml"]);
+  const docsPages = path.join(rootDir, "docs", "src", "pages") + path.sep;
+  const docsContent = path.join(rootDir, "docs", "src", "content") + path.sep;
 
   function visit(currentDirectory) {
     for (const entry of fs.readdirSync(currentDirectory, { withFileTypes: true })) {
@@ -280,6 +285,9 @@ function collectTextFiles(directory) {
         continue;
       }
       const entryPath = path.join(currentDirectory, entry.name);
+      if (entryPath.startsWith(docsPages) || entryPath.startsWith(docsContent)) {
+        continue;
+      }
       if (entry.isDirectory()) {
         visit(entryPath);
         continue;
@@ -322,15 +330,39 @@ function updatePackageMetadata(config) {
   fs.writeFileSync(packagePath, `${JSON.stringify(packageJSON, null, 2)}\n`);
 }
 
-function updateReadmeLicense(config) {
-  const readmePath = path.join(rootDir, "README.md");
-  const readme = fs.readFileSync(readmePath, "utf8");
-  const updated = readme.replace(
-    /(## License\s*\n\s*)[^\n]*/,
-    `$1${licenseDefinitions[config.license].label}`
-  );
-  if (updated !== readme) {
-    fs.writeFileSync(readmePath, updated);
+function updateDocsMetadata(config) {
+  const metadataPath = path.join(rootDir, "docs/src/data/docs.ts");
+  const source = fs.readFileSync(metadataPath, "utf8");
+  const identityBlock = /^const generatedIdentity = \{[\s\S]*?^\} as const;/m;
+  if (!identityBlock.test(source)) {
+    throw new Error("docs/src/data/docs.ts is missing its generatedIdentity metadata block.");
+  }
+
+  const metadata = {
+    name: config.cliName,
+    strapline: config.description,
+    description: config.description,
+    repoUrl: githubUrl(config),
+    footerText: config.description
+  };
+  const replacement = `const generatedIdentity = ${JSON.stringify(metadata, null, 2)} as const;`;
+  const updated = source.replace(identityBlock, replacement);
+  if (updated !== source) {
+    fs.writeFileSync(metadataPath, updated);
+  }
+}
+
+function updateDocsCanonicalUrl(config) {
+  const configPath = path.join(rootDir, "docs/astro.config.mjs");
+  const source = fs.readFileSync(configPath, "utf8");
+  const siteSetting = /^(\s*site:\s*)["'][^"']*["'](?=,?\s*$)/m;
+  if (!siteSetting.test(source)) {
+    throw new Error("docs/astro.config.mjs is missing its site URL setting.");
+  }
+
+  const updated = source.replace(siteSetting, (_, prefix) => `${prefix}${JSON.stringify(config.canonicalUrl)}`);
+  if (updated !== source) {
+    fs.writeFileSync(configPath, updated);
   }
 }
 
@@ -442,7 +474,7 @@ function readGithubRemoteIdentity() {
 function printHelp() {
   console.log(`Usage: node scripts/setup.js [options]
 
-Initialize the repeated project identity fields in one pass.
+Initialize the repeated project identity fields in one pass. Leaves README and docs pages untouched.
 
 Options (also accepted as uppercase environment variables):
   --cli-name NAME          User-facing CLI command and cmd/ directory

@@ -46,7 +46,9 @@ Direct commands:
 
 1. Run `make bootstrap` to rename the CLI command consistently.
 The bootstrap script updates the command path, npm wrapper, package metadata, Go
-module, Makefile, workflow, postinstall, docs config, and license metadata.
+module (`go.mod` included), Makefile, workflow, postinstall, docs identity/config,
+and license metadata. It intentionally does **not** rewrite `README.md` or the
+Astro/Markdown documentation pages. Write those for the new project yourself.
 
 2. Keep binary naming convention unchanged unless you also update postinstall/workflow:
 - release assets: `<binary>_<goos>_<goarch>[.exe]`
@@ -57,7 +59,8 @@ module, Makefile, workflow, postinstall, docs config, and license metadata.
 4. Keep help output expressive and command-local (`<command> --help` should explain examples).
 
 5. Update the bundled docs site when command behavior changes:
-- `docs/src/data/docs.ts` for site name, repo URL, nav, footer sections, and categories
+- `docs/src/data/docs.ts` has bootstrap-generated name, description, repo URL, and
+  footer identity. Customize non-identity settings such as nav, colors, and categories as needed.
 - `docs/src/pages/index.astro` for landing-page product copy
 - `docs/src/content/docs/*.md` for guides and command reference
 
