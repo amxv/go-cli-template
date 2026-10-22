@@ -88,6 +88,7 @@ function main() {
   console.log(`Initialized ${config.cliName} for ${githubUrl(config)}.`);
   console.log(`Go module: ${config.goModule}`);
   console.log(`Distribution: ${config.distribution}`);
+  console.log(`macOS menu bar app: ${config.macosMenubar ? "included" : "not included"}`);
   if (config.distribution === "npm") console.log(`npm package: ${config.npmPackage}`);
   console.log(`License: ${config.license}`);
   console.log("Update README.md and docs pages separately with project-specific content.");
@@ -132,6 +133,8 @@ function resolveConfig(current, options) {
     optionValue(options, "license", "LICENSE") || current.license || "Apache-2.0"
   );
   const distribution = optionValue(options, "distribution", "DISTRIBUTION") || current.distribution || "npm";
+  const macosMenubar = current.macosMenubar || options.macosMenubar === true ||
+    ["1", "true", "yes"].includes((process.env.MACOS_MENUBAR || "").toLowerCase());
 
   return {
     cliName,
@@ -146,6 +149,7 @@ function resolveConfig(current, options) {
     canonicalUrl,
     license,
     distribution,
+    macosMenubar,
     paths: {
       command: `cmd/${cliName}`,
       wrapper: `bin/${cliName}.js`,
@@ -157,6 +161,9 @@ function resolveConfig(current, options) {
 function validateConfig(config) {
   if (!["npm", "direct"].includes(config.distribution)) {
     throw new Error("DISTRIBUTION must be npm or direct.");
+  }
+  if (config.macosMenubar && config.distribution !== "direct") {
+    throw new Error("--macos-menubar is supported only with --distribution direct.");
   }
   const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
   if (!namePattern.test(config.cliName)) {
@@ -392,22 +399,37 @@ function configureDirectDistribution(config) {
     "__MODULE__": config.goModule,
     "__SITE__": config.canonicalUrl.replace(/\/$/, "")
   };
+  const appName = config.cliName
+    .split(/[._-]+/).filter(Boolean).map((word) => word[0].toUpperCase() + word.slice(1)).join("");
+  const bundleID = `com.${config.githubOwner.toLowerCase().replace(/[^a-z0-9-]/g, "-")}.${config.githubRepo.toLowerCase().replace(/[^a-z0-9-]/g, "-")}.menubar`;
+  Object.assign(substitutions, {
+    "__APP_NAME__": appName,
+    "__APP_ID__": bundleID,
+    "__APP_EXEC__": `${config.cliName}-menubar`,
+    "__MENU_LETTER__": config.cliName[0].toUpperCase()
+  });
   const generate = (source, destination) => {
     let content = fs.readFileSync(path.join(templates, source), "utf8");
     for (const [from, to] of Object.entries(substitutions)) content = content.split(from).join(to);
     const target = path.join(rootDir, destination);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, content);
+    if (destination === "apps/menubar/build.sh") fs.chmodSync(target, 0o755);
   };
 
-  generate("release.yml", ".github/workflows/release.yml");
-  generate("install.sh", "docs/public/install.sh");
+  generate(config.macosMenubar ? "release-menubar.yml" : "release.yml", ".github/workflows/release.yml");
+  generate(config.macosMenubar ? "install-menubar.sh" : "install.sh", "docs/public/install.sh");
   generate("install.ps1", "docs/public/install.ps1");
   generate("upgrade.go.txt", "internal/upgrade/upgrade.go");
   generate("upgrade_test.go.txt", "internal/upgrade/upgrade_test.go");
   generate("auto-update.go.txt", "internal/autoupdate/auto_update.go");
   generate("auto-update-scheduler.go.txt", "internal/autoupdate/scheduler.go");
   generate("auto-update_test.go.txt", "internal/autoupdate/auto_update_test.go");
+  if (config.macosMenubar) {
+    generate("menubar/Info.plist", "apps/menubar/Info.plist");
+    generate("menubar/main.swift", "apps/menubar/Sources/main.swift");
+    generate("menubar/build.sh", "apps/menubar/build.sh");
+  }
 
   const appPath = path.join(rootDir, "internal/app/app.go");
   let app = fs.readFileSync(appPath, "utf8");
@@ -444,6 +466,13 @@ function configureDirectDistribution(config) {
     .replace('"windows amd64";', '"windows amd64" "windows arm64";');
   makefile = makefile.replace(/@test -n "\$\(VERSION\)" \|\|/, '@test "$(VERSION)" != "dev" \u0026\u0026 -n "$(VERSION)" ||');
   fs.writeFileSync(makefilePath, makefile);
+
+  if (config.macosMenubar) {
+    makefile = fs.readFileSync(makefilePath, "utf8");
+    makefile = makefile.replace(/^\.PHONY:(.*)$/m, "$& menubar-build");
+    makefile += `\nmenubar-build:\n\t@./apps/menubar/build.sh "$$(pwd)/$(DIST_DIR)/${appName}.app" "$$(uname -m)" "$(VERSION)"\n`;
+    fs.writeFileSync(makefilePath, makefile);
+  }
 
   for (const relative of ["package.json", `bin/${config.cliName}.js`, "scripts/postinstall.js"]) {
     fs.rmSync(path.join(rootDir, relative), { force: true });
@@ -568,6 +597,7 @@ Options (also accepted as uppercase environment variables):
   --github-repo REPO       GitHub repository name
   --npm-package PACKAGE    npm package name
   --distribution npm|direct  npm package (default), or website install scripts and CLI upgrade
+  --macos-menubar            Opt-in Swift menu bar .app, signed + bundled with direct macOS releases
   --description TEXT       Package and repository description
   --homepage URL            npm and GitHub homepage
   --canonical-url URL       Astro canonical site URL

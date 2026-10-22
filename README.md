@@ -98,6 +98,33 @@ Automatic updates are **off until the user opts in**. Enabling them creates a da
 
 The site must be deployed at the supplied canonical URL before the upgrade command can retrieve its installer. Linux scheduling needs a working systemd user manager; individual CLIs with running services may need additional product-specific safeguards before replacing their binary.
 
+### Optional Swift macOS menu bar app
+
+Use **--macos-menubar** together with **--distribution direct** when a CLI should also ship a native macOS menu bar application:
+
+~~~bash
+make bootstrap BOOTSTRAP_ARGS='--cli-name pluck \
+  --distribution direct --macos-menubar \
+  --description "A fast file picker" \
+  --canonical-url https://pluck.example.com'
+~~~
+
+Bootstrap then creates **apps/menubar/** with a Swift/AppKit starter, an Info.plist, and a signed app build script. The menu includes **Check for Updates**, **Automatic Updates (Daily)**, **Launch Menu Bar at Login**, **Open Documentation**, and **Quit**. It calls the companion Go CLI for updates and preferences, instead of implementing another updater.
+
+To build locally on macOS:
+
+~~~bash
+make build VERSION=0.1.0
+make menubar-build VERSION=0.1.0
+codesign --verify --deep --strict dist/Pluck.app
+~~~
+
+GitHub Releases will include the normal native binaries plus a matching **CLI + signed app** archive for each macOS architecture (Apple Silicon and Intel), with SHA-256 checksum sidecars. The website installer verifies the archive and code signature, installs both under a user-writable directory such as ~/.local/bin, and opens the menu bar app on initial installation. Manual and scheduled upgrades replace both together, and **reopen the app if it was running**.
+
+The Swift app is **ad-hoc signed by default**, following the Zodex-style script installation pattern. The usual curl/tar installation does not add browser quarantine metadata and therefore avoids the typical downloaded-app prompt in that path. **This is not notarization**: manually downloaded app bundles may still trigger Gatekeeper. No Gatekeeper settings are disabled or modified.
+
+Without this flag, a generated project contains **no Swift app, app packaging job, or macOS bundle installer**. The one-time **make bootstrap-clean** command also removes the unused menu bar templates while preserving opted-in runtime app files.
+
 ## npm distribution
 
 npm bootstrap instead keeps `package.json`, the JavaScript command shim, and `scripts/postinstall.js`. The release workflow uploads native binaries to GitHub Releases and then publishes the npm package. The postinstall script downloads the matching release asset, with a local Go build fallback.

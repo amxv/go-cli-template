@@ -16,7 +16,8 @@ const templateConfig = {
   homepage: "https://github.com/amxv/go-cli-template#readme",
   canonicalUrl: "https://github.com/amxv/go-cli-template",
   license: "Apache-2.0",
-  distribution: "npm"
+  distribution: "npm",
+  macosMenubar: false
 };
 
 function readProjectConfig() {

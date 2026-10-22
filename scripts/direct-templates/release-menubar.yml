@@ -1,0 +1,143 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26"
+  CLI_BINARY: "__BINARY__"
+  CLI_ENTRYPOINT: "__CLI__"
+  CLI_MODULE: "__MODULE__"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go test ./... && go vet ./...
+
+  build:
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [darwin, linux, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build native CLI
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          version="${GITHUB_REF_NAME#v}"
+          ext=""
+          if [ "$GOOS" = windows ]; then ext=.exe; fi
+          go build -trimpath -ldflags="-s -w -X ${{ env.CLI_MODULE }}/internal/buildinfo.Version=$version" \
+            -o "dist/${{ env.CLI_BINARY }}_${GOOS}_${GOARCH}${ext}" "./cmd/${{ env.CLI_ENTRYPOINT }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  build-menubar:
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: amd64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build, ad-hoc sign, verify and package Swift menu bar app
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p stage out
+          CGO_ENABLED=0 GOOS=darwin GOARCH="$ARCH" go build -trimpath \
+            -ldflags="-s -w -X ${{ env.CLI_MODULE }}/internal/buildinfo.Version=$version" \
+            -o "stage/${{ env.CLI_ENTRYPOINT }}" "./cmd/${{ env.CLI_ENTRYPOINT }}"
+          codesign --force --sign - "stage/${{ env.CLI_ENTRYPOINT }}"
+          codesign --verify --strict "stage/${{ env.CLI_ENTRYPOINT }}"
+          swift_arch="$ARCH"
+          if [ "$ARCH" = amd64 ]; then swift_arch=x86_64; fi
+          bash apps/menubar/build.sh "$PWD/stage/__APP_NAME__.app" "$swift_arch" "$version"
+          codesign --verify --deep --strict "stage/__APP_NAME__.app"
+          "stage/__APP_NAME__.app/Contents/MacOS/__APP_EXEC__" --check
+          cp LICENSE stage/LICENSE
+          archive="${{ env.CLI_BINARY }}_darwin_${ARCH}.tar.gz"
+          COPYFILE_DISABLE=1 tar -czf "out/$archive" -C stage "${{ env.CLI_ENTRYPOINT }}" "__APP_NAME__.app" LICENSE
+          shasum -a 256 "out/$archive" | awk '{ print $1 }' > "out/$archive.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: menubar-${{ matrix.arch }}
+          path: out/*
+          if-no-files-found: error
+
+  github-release:
+    needs: [build, build-menubar]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Verify both macOS bundles and all native binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for os in darwin linux windows; do
+            for arch in amd64 arm64; do
+              suffix=""
+              if [ "$os" = windows ]; then suffix=".exe"; fi
+              test -s "dist/${{ env.CLI_BINARY }}_${os}_${arch}${suffix}"
+            done
+          done
+          for arch in amd64 arm64; do
+            archive="${{ env.CLI_BINARY }}_darwin_${arch}.tar.gz"
+            test -s "dist/$archive"
+            test -s "dist/$archive.sha256"
+            (cd dist && printf '%s  %s\n' "$(cat "$archive.sha256")" "$archive" | sha256sum -c -)
+          done
+          (
+            cd dist
+            for asset in "${{ env.CLI_BINARY }}"_*; do
+              case "$asset" in *.sha256) continue ;; esac
+              sha256sum "$asset"
+            done > SHA256SUMS
+          )
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true

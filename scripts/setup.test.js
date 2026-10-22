@@ -89,6 +89,7 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   assert.equal(pkg.name, "@example/lampo");
   assert.equal(pkg.config.goModule, "example.com/graphics/lampo");
   assert.deepEqual(pkg.bin, { lampo: "bin/lampo.js" });
+  assert.equal(fs.existsSync(path.join(checkout, "apps/menubar")), false);
   assert.ok(pkg.files.includes("bin/lampo.js"));
   assert.ok(pkg.scripts.test.includes("bin/lampo.js"));
   assert.equal(JSON.parse(read(checkout, "docs/package.json")).name, "@example/lampo-docs");
@@ -118,6 +119,7 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   }
   run(checkout, process.execPath, ["scripts/cleanup.js"]);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/direct-templates/menubar")), false);
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), true);
   assert.doesNotMatch(read(checkout, "Makefile"), /^bootstrap:/m);
@@ -150,6 +152,7 @@ test("direct bootstrap produces only native release + installers, then cleans it
   assert.equal(fs.existsSync(path.join(checkout, "package.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "bin/spark.js")), false);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "apps/menubar")), false);
   assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);
   assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.ps1")), true);
   assert.match(read(checkout, "docs/public/install.sh"), /github\.com\/example\/spark/);

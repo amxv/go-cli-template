@@ -35,7 +35,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
-    "test": "node --check bin/mycli.js && node --check scripts/postinstall.js && node --check scripts/project.js && node --check scripts/setup.js && node --test scripts/setup.test.js",
+    "test": "node --check bin/mycli.js && node --check scripts/postinstall.js && node --check scripts/project.js && node --check scripts/setup.js && node --check scripts/menubar.test.js && node --test scripts/setup.test.js scripts/menubar.test.js",
     "lint": "npm run test"
   },
   "engines": {

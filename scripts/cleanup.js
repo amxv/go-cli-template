@@ -32,6 +32,7 @@ function main() {
 
   const removable = [
     "project.config.json", "scripts/project.js", "scripts/setup.js", "scripts/setup.test.js",
+    "scripts/menubar.test.js",
     "scripts/cleanup.js"
   ];
   for (const relative of removable) fs.rmSync(path.join(rootDir, relative), { force: true });

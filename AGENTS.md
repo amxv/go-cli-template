@@ -82,6 +82,21 @@ and docs files intact.
 - keep repo-specific content/config local instead of forking shared shell files
 - keep all web tooling under `docs/`; Vercel should use `docs` as the Root Directory
 
+## Optional macOS menu bar scaffold
+
+Only direct-distribution Bootstrap accepts **--macos-menubar**. When selected,
+it creates a real Swift/AppKit app under apps/menubar, a menubar-build Make
+target, and a paired macOS CLI + .app tarball release job. The website
+installer verifies archive SHA-256 and the ad-hoc app signature, installs the
+pair together, and reopens the menu bar app after upgrades if it was running.
+The app uses the Go CLI's existing upgrade and auto-update commands.
+
+Default/npm/direct-without-flag scaffolds must not contain apps/menubar or the
+app release job. Bootstrap-clean removes any unused Swift templates and leaves
+the selected app source only if opted in. Ad-hoc signing is not notarization:
+the scripted curl/tar path does not carry Finder quarantine, but manually
+downloaded apps may still trigger Gatekeeper.
+
 ## Release contract
 
 Release pipeline triggers on `v*` tags and expects:

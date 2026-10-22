@@ -23,6 +23,15 @@ if the project bootstrapped with `--distribution npm`.
   generates `SHA256SUMS`.
 - The release workflow exists at `.github/workflows/release.yml`.
 
+## Optional macOS menu bar artifacts
+
+When the direct-release project contains apps/menubar, the tag workflow must
+also build signed Apple Silicon/Intel Swift bundles. Each macOS tarball includes
+the version-matched CLI, AppName.app and license, accompanied by a .sha256
+sidecar. Verify code signatures, release-asset checksums, and the website
+installer's update/relaunch path. Without apps/menubar, do not expect these
+artifacts. Ad-hoc signatures do not imply Developer ID notarization.
+
 ## Changelog first
 
 Before tagging, manually update `docs/src/content/docs/changelog.md`:

@@ -10,6 +10,7 @@
   "canonicalUrl": "https://github.com/amxv/go-cli-template",
   "license": "Apache-2.0",
   "distribution": "npm",
+  "macosMenubar": false,
   "paths": {
     "command": "cmd/mycli",
     "wrapper": "bin/mycli.js",
