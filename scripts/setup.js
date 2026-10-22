@@ -63,6 +63,13 @@ function main() {
   const current = readProjectConfig();
   let config = resolveConfig(current, options);
   validateConfig(config);
+  if (current.githubRepo !== templateConfig.githubRepo &&
+      current.distribution !== config.distribution) {
+    throw new Error("Distribution is selected during initial bootstrap. Start from a fresh template to change it.");
+  }
+  if (config.distribution === "direct" && optionValue(options, "npmPackage", "NPM_PACKAGE")) {
+    throw new Error("--npm-package is only valid with --distribution npm.");
+  }
   warnForPrivateAnonymousInstall(options);
   const explicitLicense = Boolean(optionValue(options, "license", "LICENSE"));
   config = regenerateLicense(config, explicitLicense);
@@ -73,11 +80,15 @@ function main() {
   updatePackageMetadata(config);
   updateDocsMetadata(config);
   updateDocsCanonicalUrl(config);
+  if (config.distribution === "direct") {
+    configureDirectDistribution(config);
+  }
   writeProjectConfig(config);
 
   console.log(`Initialized ${config.cliName} for ${githubUrl(config)}.`);
   console.log(`Go module: ${config.goModule}`);
-  console.log(`npm package: ${config.npmPackage}`);
+  console.log(`Distribution: ${config.distribution}`);
+  if (config.distribution === "npm") console.log(`npm package: ${config.npmPackage}`);
   console.log(`License: ${config.license}`);
   console.log("Update README.md and docs pages separately with project-specific content.");
 }
@@ -120,6 +131,7 @@ function resolveConfig(current, options) {
   const license = normalizeLicense(
     optionValue(options, "license", "LICENSE") || current.license || "Apache-2.0"
   );
+  const distribution = optionValue(options, "distribution", "DISTRIBUTION") || current.distribution || "npm";
 
   return {
     cliName,
@@ -133,6 +145,7 @@ function resolveConfig(current, options) {
     homepage,
     canonicalUrl,
     license,
+    distribution,
     paths: {
       command: `cmd/${cliName}`,
       wrapper: `bin/${cliName}.js`,
@@ -142,6 +155,9 @@ function resolveConfig(current, options) {
 }
 
 function validateConfig(config) {
+  if (!["npm", "direct"].includes(config.distribution)) {
+    throw new Error("DISTRIBUTION must be npm or direct.");
+  }
   const namePattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
   if (!namePattern.test(config.cliName)) {
     throw new Error("CLI_NAME must contain only letters, numbers, dots, underscores, or hyphens.");
@@ -366,6 +382,62 @@ function updateDocsCanonicalUrl(config) {
   }
 }
 
+function configureDirectDistribution(config) {
+  const templates = path.join(rootDir, "scripts/direct-templates");
+  const substitutions = {
+    "__CLI__": config.cliName,
+    "__BINARY__": config.binaryName,
+    "__OWNER__": config.githubOwner,
+    "__REPO__": config.githubRepo,
+    "__MODULE__": config.goModule,
+    "__SITE__": config.canonicalUrl.replace(/\/$/, "")
+  };
+  const generate = (source, destination) => {
+    let content = fs.readFileSync(path.join(templates, source), "utf8");
+    for (const [from, to] of Object.entries(substitutions)) content = content.split(from).join(to);
+    const target = path.join(rootDir, destination);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+  };
+
+  generate("release.yml", ".github/workflows/release.yml");
+  generate("install.sh", "docs/public/install.sh");
+  generate("install.ps1", "docs/public/install.ps1");
+  generate("upgrade.go.txt", "internal/upgrade/upgrade.go");
+
+  const appPath = path.join(rootDir, "internal/app/app.go");
+  let app = fs.readFileSync(appPath, "utf8");
+  const importLine = `"${config.goModule}/internal/upgrade"`;
+  if (!app.includes(importLine)) {
+    app = app.replace(/(^import \(\s*\n)/m, `$1${importLine}\n`);
+  }
+  if (!app.includes('case "upgrade":')) {
+    app = app.replace(/(switch args\[0\] \{\s*\n)/, '$1case "upgrade":\nreturn upgrade.Run(args[1:], stdout)\n');
+  }
+  app = app.replace(/"  hello \[name\]    print a greeting",/, '"  hello [name]    print a greeting",\n"  upgrade [--check]    install latest verified release",');
+  fs.writeFileSync(appPath, app);
+
+  const makefilePath = path.join(rootDir, "Makefile");
+  let makefile = fs.readFileSync(makefilePath, "utf8");
+  makefile = makefile
+    .replace(/^VERSION \?=.*$/m, "VERSION ?= dev")
+    .replace(/^lint:\n\t@npm run lint\n\n/m, "")
+    .replace(/^check: fmt test vet lint$/m, "check: fmt test vet")
+    .replace(/ lint check /, " check ")
+    .replace(/^\t@echo "  make lint .*\n/m, "")
+    .replace(/^\t@echo "go-cli-template command runner"/m, `\t@echo "${config.cliName} command runner"`)
+    .replace(/^\t@echo "  make bootstrap    - .*$/m, '\t@echo "  make bootstrap    - initialize native CLI, releases, and docs metadata"')
+    .replace(/^\t@echo "  make check .*$/m, '\t@echo "  make check        - fmt + test + vet"')
+    .replace(/^\t@echo "  make build-all .*\n/m, "\t@echo \"  make build-all    - build all 6 release binaries\"\n")
+    .replace('"windows amd64";', '"windows amd64" "windows arm64";');
+  makefile = makefile.replace(/@test -n "\$\(VERSION\)" \|\|/, '@test "$(VERSION)" != "dev" \u0026\u0026 -n "$(VERSION)" ||');
+  fs.writeFileSync(makefilePath, makefile);
+
+  for (const relative of ["package.json", `bin/${config.cliName}.js`, "scripts/postinstall.js"]) {
+    fs.rmSync(path.join(rootDir, relative), { force: true });
+  }
+}
+
 function regenerateLicense(config, explicitLicense) {
   if (config.license === "Apache-2.0" && !explicitLicense) {
     updateApacheLicenseNotice(config);
@@ -483,6 +555,7 @@ Options (also accepted as uppercase environment variables):
   --github-owner OWNER     GitHub owner or organization
   --github-repo REPO       GitHub repository name
   --npm-package PACKAGE    npm package name
+  --distribution npm|direct  npm package (default), or website install scripts and CLI upgrade
   --description TEXT       Package and repository description
   --homepage URL            npm and GitHub homepage
   --canonical-url URL       Astro canonical site URL

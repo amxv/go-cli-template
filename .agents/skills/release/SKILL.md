@@ -9,14 +9,17 @@ allowed-tools: Bash, Read, Write, Edit
 Use this skill when cutting a release for a project generated from
 `go-cli-template`. The release is intentionally controlled by the repository:
 edit the changelog, commit it, and push a `v*` tag. GitHub Actions builds the
-native binaries, creates the GitHub Release, and publishes npm.
+native binaries and creates a GitHub Release. npm publishing is included **only**
+if the project bootstrapped with `--distribution npm`.
 
 ## Preconditions
 
 - You are on `main` and synced with `origin/main`.
 - The working tree is clean except intentional release edits.
-- The package name in `package.json` is publishable.
-- The `NPM_TOKEN` GitHub secret is configured.
+- In npm mode only, the package name in `package.json` is publishable and
+  the `NPM_TOKEN` GitHub secret is configured.
+- In direct mode, `docs/public/install.sh`, `install.ps1`, and the `upgrade`
+  command exist, and the release workflow generates `SHA256SUMS`.
 - The release workflow exists at `.github/workflows/release.yml`.
 
 ## Changelog first
@@ -65,6 +68,12 @@ gh release view "v${VERSION}" --json tagName,name,url,assets
 npm view "$(node -p "require('./package.json').name")" version
 ```
 
-Report the tag, workflow URL, release URL, asset names, and published npm
-version. The template does not sync local keychains, validate release secrets,
+Run the final `npm view` command **only** for npm distribution. For direct
+distribution, verify the GitHub Release has six native binaries and `SHA256SUMS`,
+the website serves both installers, and `<cli> upgrade --check` works without
+modifying the installed CLI.
+
+Report the tag, workflow URL, release URL, asset names, and the chosen
+distribution path (npm package/version or direct installer verification).
+The template does not sync local keychains, validate release secrets,
 or orchestrate the workflow from a local `ship` command.

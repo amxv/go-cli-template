@@ -9,6 +9,7 @@
   "homepage": "https://github.com/amxv/go-cli-template#readme",
   "canonicalUrl": "https://github.com/amxv/go-cli-template",
   "license": "Apache-2.0",
+  "distribution": "npm",
   "paths": {
     "command": "cmd/mycli",
     "wrapper": "bin/mycli.js",

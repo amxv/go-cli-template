@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -115,6 +116,13 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   for (const [file, content] of originalContent) {
     assert.equal(read(checkout, file), content, `${file} should still be untouched`);
   }
+  run(checkout, process.execPath, ["scripts/cleanup.js"]);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), true);
+  assert.doesNotMatch(read(checkout, "Makefile"), /^bootstrap:/m);
+  run(checkout, "npm", ["test"]);
+  run(checkout, "go", ["test", "./..."]);
 });
 
 test("bootstrap infers the new repository's module, package, and docs links", { skip: templateOnly }, (t) => {
@@ -128,4 +136,99 @@ test("bootstrap infers the new repository's module, package, and docs links", { 
   assert.equal(docsIdentity(checkout).repoUrl, "https://github.com/octo/mist");
   assert.equal(docsIdentity(checkout).description, "Mist CLI");
   run(checkout, "go", ["test", "./..."]);
+});
+
+test("direct bootstrap produces only native release + installers, then cleans itself", { skip: templateOnly }, (t) => {
+  const checkout = copyTemplate(t);
+  const originalContent = new Map(contentFiles.map((file) => [file, read(checkout, file)]));
+  run(checkout, process.execPath, [
+    "scripts/setup.js", "--cli-name", "spark", "--binary-name", "spark",
+    "--github-owner", "example", "--github-repo", "spark",
+    "--go-module", "github.com/example/spark", "--description", "Fast native CLI",
+    "--canonical-url", "https://spark.example.com", "--distribution", "direct"
+  ]);
+  assert.equal(fs.existsSync(path.join(checkout, "package.json")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "bin/spark.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);
+  assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.ps1")), true);
+  assert.match(read(checkout, "docs/public/install.sh"), /github\.com\/example\/spark/);
+  assert.match(read(checkout, "docs/public/install.ps1"), /github\.com\/example\/spark/);
+  assert.match(read(checkout, "internal/upgrade/upgrade.go"), /https:\/\/spark\.example\.com/);
+  assert.match(read(checkout, "internal/app/app.go"), /case "upgrade":/);
+  assert.match(read(checkout, ".github/workflows/release.yml"), /SHA256SUMS/);
+  assert.doesNotMatch(read(checkout, ".github/workflows/release.yml"), /npm|NPM_TOKEN/);
+  assert.doesNotMatch(read(checkout, "Makefile"), /npm|NPM_TOKEN/);
+  assert.equal(docsIdentity(checkout).description, "Fast native CLI");
+  assert.equal(read(checkout, "go.mod").split("\n")[0], "module github.com/example/spark");
+  for (const [file, content] of originalContent) {
+    assert.equal(read(checkout, file), content, `${file} should remain agent-authored`);
+  }
+  run(checkout, "sh", ["-n", "docs/public/install.sh"]);
+  run(checkout, "make", ["check"]);
+  run(checkout, "make", ["build"]);
+  if (process.platform !== "win32") {
+    const releaseDir = path.join(checkout, "fake-release");
+    const commands = path.join(releaseDir, "commands");
+    fs.mkdirSync(commands, { recursive: true });
+    const osName = process.platform === "darwin" ? "darwin" : "linux";
+    const cpuName = process.arch === "arm64" ? "arm64" : "amd64";
+    const assetName = `spark_${osName}_${cpuName}`;
+    const binary = fs.readFileSync(path.join(checkout, "dist/spark"));
+    fs.writeFileSync(path.join(releaseDir, assetName), binary);
+    const sha256 = crypto.createHash("sha256").update(binary).digest("hex");
+    const checksums = path.join(releaseDir, "SHA256SUMS");
+    fs.writeFileSync(checksums, `${sha256}  ${assetName}\n`);
+    const fakeCurl = path.join(commands, "curl");
+    fs.writeFileSync(fakeCurl, `#!/bin/sh
+target=""
+last=""
+previous=""
+for arg in "$@"; do
+  if [ "$previous" = '-o' ]; then target="$arg"; fi
+  previous="$arg"
+  last="$arg"
+done
+case "$last" in
+  */SHA256SUMS) cp "$FAKE_RELEASE/SHA256SUMS" "$target" ;;
+  */${assetName}) cp "$FAKE_RELEASE/${assetName}" "$target" ;;
+  *) exit 41 ;;
+esac
+`);
+    fs.chmodSync(fakeCurl, 0o755);
+    const installDir = path.join(releaseDir, "bin");
+    const env = {
+      ...process.env,
+      PATH: `${commands}:${process.env.PATH}`,
+      CLI_INSTALL_DIR: installDir,
+      CLI_VERSION: "0.1.0",
+      FAKE_RELEASE: releaseDir
+    };
+    const invoke = (...args) => spawnSync("sh", ["docs/public/install.sh", ...args], { cwd: checkout, env, encoding: "utf8" });
+    let result = invoke();
+    assert.equal(result.status, 0, result.stderr);
+    const installed = path.join(installDir, "spark");
+    assert.deepEqual(fs.readFileSync(installed), binary);
+    result = invoke();
+    assert.notEqual(result.status, 0, "installer must refuse overwriting an existing CLI");
+    fs.writeFileSync(checksums, `${"0".repeat(64)}  ${assetName}\n`);
+    result = invoke("upgrade");
+    assert.notEqual(result.status, 0, "upgrade must refuse a bad checksum");
+    assert.deepEqual(fs.readFileSync(installed), binary);
+    fs.writeFileSync(checksums, `${sha256}  ${assetName}\n`);
+    result = invoke("upgrade");
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(installed), binary);
+  }
+  const invalid = spawnSync(path.join(checkout, "dist/spark"), ["upgrade", "--wrong-option"], { cwd: checkout, encoding: "utf8" });
+  assert.notEqual(invalid.status, 0);
+  assert.match(invalid.stderr, /usage: spark upgrade/);
+  run(checkout, process.execPath, ["scripts/cleanup.js"]);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/setup.js")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
+  assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);
+  assert.equal(fs.existsSync(path.join(checkout, "internal/upgrade/upgrade.go")), true);
+  assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), false);
+  run(checkout, "make", ["check"]);
+  run(checkout, "make", ["build"]);
 });

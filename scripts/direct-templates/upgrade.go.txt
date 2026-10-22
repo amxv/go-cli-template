@@ -1,0 +1,97 @@
+// Package upgrade downloads the project-owned installer and executes it.
+// The installer verifies GitHub Release SHA-256 checksums before replacement.
+package upgrade
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"time"
+)
+
+const installerBase = "__SITE__"
+
+func Run(args []string, out io.Writer) error {
+	if len(args) > 1 || (len(args) == 1 && args[0] != "--check") {
+		return errors.New("usage: __CLI__ upgrade [--check]")
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("find executable: %w", err)
+	}
+	executable, err = filepath.Abs(executable)
+	if err != nil {
+		return err
+	}
+
+	name := "install.sh"
+	if runtime.GOOS == "windows" {
+		name = "install.ps1"
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	response, err := client.Get(installerBase + "/" + name)
+	if err != nil {
+		return fmt.Errorf("download installer: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("installer request returned HTTP %d", response.StatusCode)
+	}
+	source, err := io.ReadAll(io.LimitReader(response.Body, 256*1024+1))
+	if err != nil {
+		return err
+	}
+	if len(source) > 256*1024 {
+		return errors.New("installer exceeds size limit")
+	}
+
+	tmp, err := os.CreateTemp("", "__CLI__-upgrade-*"+filepath.Ext(name))
+	if err != nil {
+		return err
+	}
+	if _, err = tmp.Write(source); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+
+	if runtime.GOOS == "windows" {
+		arguments := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", tmp.Name(), "-Upgrade", "-Target", executable, "-WaitForPid", fmt.Sprint(os.Getpid())}
+		if len(args) == 1 {
+			arguments = []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", tmp.Name(), "-Check", "-Target", executable}
+		}
+		command := exec.Command("powershell.exe", arguments...)
+		command.Stdout = out
+		command.Stderr = os.Stderr
+		if len(args) == 1 {
+			defer os.Remove(tmp.Name())
+			return command.Run()
+		}
+		if err := command.Start(); err != nil {
+			_ = os.Remove(tmp.Name())
+			return err
+		}
+		_ = command.Process.Release()
+		fmt.Fprintln(out, "Verified upgrade started; replacement completes after this command exits.")
+		return nil
+	}
+	defer os.Remove(tmp.Name())
+	mode := "upgrade"
+	if len(args) == 1 {
+		mode = "--check"
+	}
+	command := exec.Command("sh", tmp.Name(), mode)
+	command.Env = append(os.Environ(), "CLI_UPGRADE_TARGET="+executable)
+	command.Stdout = out
+	command.Stderr = os.Stderr
+	return command.Run()
+}

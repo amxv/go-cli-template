@@ -15,7 +15,8 @@ const templateConfig = {
   description: "Template for shipping a Go CLI via npm with GitHub release automation",
   homepage: "https://github.com/amxv/go-cli-template#readme",
   canonicalUrl: "https://github.com/amxv/go-cli-template",
-  license: "Apache-2.0"
+  license: "Apache-2.0",
+  distribution: "npm"
 };
 
 function readProjectConfig() {

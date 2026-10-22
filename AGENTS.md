@@ -4,7 +4,9 @@ Guidance for coding agents working in `go-cli-template`.
 
 ## Purpose
 
-This repo is a generic starter for Go command-line tools distributed through npm.
+This repo is a generic starter for Go command-line tools. Bootstrap can choose
+`--distribution npm` or `--distribution direct` (GitHub Releases, website
+install scripts, and a native `upgrade` command).
 
 The sample command is `mycli`. Replace it with your actual CLI name and behavior.
 
@@ -33,6 +35,7 @@ Use `make` targets:
 - `make build-all`
 - `make install-local`
 - `make bootstrap BOOTSTRAP_ARGS='...'`
+- `make bootstrap-clean` (run once after final identity/docs setup)
 
 Direct commands:
 
@@ -44,11 +47,16 @@ Direct commands:
 
 ## How to customize safely
 
-1. Run `make bootstrap` to rename the CLI command consistently.
+1. Run `make bootstrap` with `--distribution npm|direct` to rename the CLI command consistently.
 The bootstrap script updates the command path, npm wrapper, package metadata, Go
 module (`go.mod` included), Makefile, workflow, postinstall, docs identity/config,
 and license metadata. It intentionally does **not** rewrite `README.md` or the
 Astro/Markdown documentation pages. Write those for the new project yourself.
+For `direct`, don't pass `--npm-package`. Bootstrap removes npm packaging and
+replaces it with website installers + GitHub Release checksums and `upgrade`.
+After all identity/deployment settings are finalized, run `make bootstrap-clean`
+to retire bootstrap scripts, tests, and one-time config. Keep app/release/install
+and docs files intact.
 
 2. Keep binary naming convention unchanged unless you also update postinstall/workflow:
 - release assets: `<binary>_<goos>_<goarch>[.exe]`
@@ -74,9 +82,11 @@ Astro/Markdown documentation pages. Write those for the new project yourself.
 
 Release pipeline triggers on `v*` tags and expects:
 
-- `NPM_TOKEN` GitHub secret present before the first tag-driven release.
-- npm package name in `package.json` is publishable under your account/org.
-- repository URL matches the release origin used by `scripts/postinstall.js`.
+- For npm mode only: `NPM_TOKEN` GitHub secret is present before first release;
+  the `package.json` name is publishable and postinstall points to the repo.
+- For direct mode only: release workflow produces six native binaries and
+  `SHA256SUMS`, the website serves `install.sh` and `install.ps1`, and the
+  `upgrade [--check]` command is implemented.
 - public GitHub visibility is the normal anonymous npm install path.
 
 ## Guardrails
@@ -95,4 +105,4 @@ This template includes:
 When customizing the template for a real CLI, keep both files and update the
 placeholder changelog manually before each release. Run the checks and docs
 validation, commit and push the changelog, then push a `v*` tag. GitHub Actions
-builds the release assets and publishes npm.
+builds the release assets and publishes npm only in npm mode.

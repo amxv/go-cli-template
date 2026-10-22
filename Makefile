@@ -10,13 +10,14 @@ BIN_PATH ?= $(DIST_DIR)/$(BIN_NAME)
 VERSION ?= $(shell node -p "require('./package.json').version" 2>/dev/null)
 LDFLAGS ?= -s -w -X github.com/amxv/go-cli-template/internal/buildinfo.Version=$(if $(VERSION),$(VERSION),dev)
 
-.PHONY: help bootstrap fmt test vet lint check docs-install docs-dev docs-check docs-build docs-preview build build-all install-local clean release-tag
+.PHONY: help bootstrap bootstrap-clean fmt test vet lint check docs-install docs-dev docs-check docs-build docs-preview build build-all install-local clean release-tag
 
 help:
 	@echo "go-cli-template command runner"
 	@echo ""
 	@echo "Targets:"
 	@echo "  make bootstrap    - initialize CLI, module, repo, npm, docs, and license identity"
+	@echo "  make bootstrap-clean - retire one-time bootstrap machinery after setup"
 	@echo "  make fmt          - format Go files"
 	@echo "  make test         - run go test ./..."
 	@echo "  make vet          - run go vet ./..."
@@ -35,6 +36,9 @@ help:
 
 bootstrap:
 	@node scripts/setup.js $(BOOTSTRAP_ARGS)
+
+bootstrap-clean:
+	@node scripts/cleanup.js
 
 fmt:
 	@$(GOFMT) -w $$(find . -type f -name '*.go' -not -path './dist/*')
