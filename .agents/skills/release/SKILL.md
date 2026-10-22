@@ -19,7 +19,8 @@ if the project bootstrapped with `--distribution npm`.
 - In npm mode only, the package name in `package.json` is publishable and
   the `NPM_TOKEN` GitHub secret is configured.
 - In direct mode, `docs/public/install.sh`, `install.ps1`, and the `upgrade`
-  command exist, and the release workflow generates `SHA256SUMS`.
+  and `auto-update on|off|status` commands exist, and the release workflow
+  generates `SHA256SUMS`.
 - The release workflow exists at `.github/workflows/release.yml`.
 
 ## Changelog first
@@ -71,7 +72,9 @@ npm view "$(node -p "require('./package.json').name")" version
 Run the final `npm view` command **only** for npm distribution. For direct
 distribution, verify the GitHub Release has six native binaries and `SHA256SUMS`,
 the website serves both installers, and `<cli> upgrade --check` works without
-modifying the installed CLI.
+modifying the installed CLI. Verify the CLI's opt-in daily auto-update controls
+in a sandbox before publication, without registering a real scheduler on the
+maintainer's machine.
 
 Report the tag, workflow URL, release URL, asset names, and the chosen
 distribution path (npm package/version or direct installer verification).

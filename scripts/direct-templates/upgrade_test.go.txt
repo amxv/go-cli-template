@@ -1,0 +1,27 @@
+package upgrade
+
+import "testing"
+
+func TestSemverAndRedirectValidation(t *testing.T) {
+    tests := []struct{ latest, current string; expect bool }{
+        {"1.2.0", "1.1.9", true}, {"1.2.1", "1.2.1", false},
+        {"1.2.0", "1.3.0", false}, {"2.0.0", "1.99.99", true},
+    }
+    for _, test := range tests {
+        got, err := newer(test.latest, test.current)
+        if err != nil || got != test.expect { t.Fatalf("%v: %v %v", test, got, err) }
+    }
+    for _, invalid := range []string{"dev", "1.2", "1.2.3-beta", "1.2.3.4"} {
+        if _, err := parseVersion(invalid); err == nil { t.Fatalf("accepted bad version %q", invalid) }
+    }
+    tag, err := tagFromLocation("https://github.com/__OWNER__/__REPO__/releases/tag/v1.2.3")
+    if err != nil || tag != "1.2.3" { t.Fatalf("valid release redirect: %q %v", tag, err) }
+    for _, invalid := range []string{
+        "https://evil.example/releases/tag/v1.2.3",
+        "https://github.com/another/repo/releases/tag/v1.2.3",
+        "https://github.com/__OWNER__/__REPO__/releases/tag/v1.2.3?bad=1",
+        "https://github.com/__OWNER__/__REPO__/releases/tag/v1.2.3-rc1",
+    } {
+        if _, err := tagFromLocation(invalid); err == nil { t.Fatalf("accepted %s", invalid) }
+    }
+}

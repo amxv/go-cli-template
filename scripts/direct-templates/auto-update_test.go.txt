@@ -1,0 +1,51 @@
+package autoupdate
+
+import (
+    "os"
+    "path/filepath"
+    "strings"
+    "testing"
+    "time"
+)
+
+func TestDailyClaimAndOptOut(t *testing.T) {
+    t.Setenv("HOME", t.TempDir())
+    // Windows uses APPDATA; tests never register a real OS scheduler.
+    if os.Getenv("APPDATA") != "" { t.Setenv("APPDATA", t.TempDir()) }
+    state, err := load()
+    if err != nil || state.Enabled { t.Fatalf("default must be off: %v %#v", err, state) }
+    start := time.Unix(1_000_000, 0)
+    if err := save(preferences{Enabled: true}); err != nil { t.Fatal(err) }
+    first, err := claimAt(start)
+    if err != nil || !first { t.Fatalf("first claim: %v %v", first, err) }
+    for _, delta := range []time.Duration{time.Second, 23*time.Hour + 59*time.Minute} {
+        claimed, err := claimAt(start.Add(delta))
+        if err != nil || claimed { t.Fatalf("too early at %v: %v %v", delta, claimed, err) }
+    }
+    claimed, err := claimAt(start.Add(24 * time.Hour))
+    if err != nil || !claimed { t.Fatalf("daily claim: %v %v", claimed, err) }
+    if err := save(preferences{Enabled: false, LastCheck: start.Unix()}); err != nil { t.Fatal(err) }
+    claimed, err = claimAt(start.Add(96 * time.Hour))
+    if err != nil || claimed { t.Fatal("opt-out must prevent scheduled checks") }
+}
+
+func TestSchedulerDefinitions(t *testing.T) {
+    plist := string(launchAgentPlist(`/Applications/My App/tool`, `/Users/me/auto.log`))
+    if !strings.Contains(plist, "<integer>86400</integer>") || !strings.Contains(plist, "--automatic") {
+        t.Fatal("macOS scheduler must check daily")
+    }
+    if !strings.Contains(string(linuxTimer()), "OnCalendar=daily") || !strings.Contains(string(linuxTimer()), "Persistent=true") {
+        t.Fatal("Linux must run a persistent daily user timer")
+    }
+    if !strings.Contains(string(linuxService(`/home/me/my app`)), "upgrade --automatic") {
+        t.Fatal("Linux service missing CLI command")
+    }
+    task := strings.Join(windowsTaskArgs(`C:\Program Files\Example\tool.exe`), " ")
+    if !strings.Contains(task, "DAILY") || !strings.Contains(task, "upgrade --automatic") {
+        t.Fatal("Windows must schedule a daily task")
+    }
+    home := t.TempDir()
+    path := filepath.Join(home, "sub", "state.json")
+    if err := writeAtomic(path, []byte("enabled"), 0600); err != nil { t.Fatal(err) }
+    if value, err := os.ReadFile(path); err != nil || string(value) != "enabled" { t.Fatal("atomic state write failed") }
+}

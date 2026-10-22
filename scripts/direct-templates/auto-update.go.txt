@@ -1,0 +1,140 @@
+// Package autoupdate owns the durable opt-in preference and daily check cadence.
+// The operating system runs the CLI independently of the current terminal.
+package autoupdate
+
+import (
+    "encoding/json"
+    "errors"
+    "fmt"
+    "io"
+    "os"
+    "path/filepath"
+    "time"
+)
+
+const interval = 24 * time.Hour
+
+type preferences struct {
+    Enabled bool `json:"enabled"`
+    LastCheck int64 `json:"last_check_unix"`
+}
+
+func stateFile() (string, error) {
+    root, err := os.UserConfigDir()
+    if err != nil { return "", err }
+    return filepath.Join(root, "__CLI__", "auto-update.json"), nil
+}
+
+func load() (preferences, error) {
+    path, err := stateFile()
+    if err != nil { return preferences{}, err }
+    data, err := os.ReadFile(path)
+    if os.IsNotExist(err) { return preferences{}, nil } // Explicit opt-in.
+    if err != nil { return preferences{}, err }
+    var state preferences
+    if err := json.Unmarshal(data, &state); err != nil {
+        return preferences{}, fmt.Errorf("invalid auto-update preferences: %w", err)
+    }
+    return state, nil
+}
+
+func writeAtomic(path string, data []byte, mode os.FileMode) error {
+    if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil { return err }
+    if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
+        return fmt.Errorf("refusing non-regular auto-update path %s", path)
+    } else if err != nil && !os.IsNotExist(err) { return err }
+    file, err := os.CreateTemp(filepath.Dir(path), ".auto-update-*")
+    if err != nil { return err }
+    defer os.Remove(file.Name())
+    if err := file.Chmod(mode); err != nil { _ = file.Close(); return err }
+    if _, err := file.Write(data); err != nil { _ = file.Close(); return err }
+    if err := file.Sync(); err != nil { _ = file.Close(); return err }
+    if err := file.Close(); err != nil { return err }
+    return os.Rename(file.Name(), path)
+}
+
+func save(state preferences) error {
+    path, err := stateFile()
+    if err != nil { return err }
+    data, err := json.MarshalIndent(state, "", "  ")
+    if err != nil { return err }
+    return writeAtomic(path, append(data, '\n'), 0600)
+}
+
+// Enabled is read again before an automatic install so an opt-out wins if it
+// occurred after the scheduled check started.
+func Enabled() (bool, error) {
+    state, err := load()
+    return state.Enabled, err
+}
+
+// Claim reserves at most one background check per 24 hours, even when offline.
+// It never disables the preference after an error. Only scheduler invocations
+// call Claim; manual upgrades are unrestricted.
+func Claim() (bool, error) { return claimAt(time.Now()) }
+
+func claimAt(now time.Time) (bool, error) {
+    path, err := stateFile()
+    if err != nil { return false, err }
+    lock := path + ".lock"
+    if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil { return false, err }
+    if err := os.Mkdir(lock, 0700); err != nil {
+        if !os.IsExist(err) { return false, err }
+        // A killed process must not block updates forever.
+        if info, statErr := os.Stat(lock); statErr == nil && now.Sub(info.ModTime()) > time.Hour {
+            _ = os.Remove(lock)
+            if retry := os.Mkdir(lock, 0700); retry != nil { return false, nil }
+        } else { return false, nil }
+    }
+    defer os.Remove(lock)
+    state, err := load()
+    if err != nil || !state.Enabled { return false, err }
+    elapsed := now.Unix() - state.LastCheck
+    if state.LastCheck > 0 && elapsed >= 0 && elapsed < int64(interval.Seconds()) {
+        return false, nil
+    }
+    state.LastCheck = now.Unix()
+    if err := save(state); err != nil { return false, err }
+    return true, nil
+}
+
+// Run handles the user-facing `auto-update on|off|status` command.
+func Run(args []string, out io.Writer) error {
+    if len(args) != 1 { return errors.New("usage: __CLI__ auto-update on|off|status") }
+    state, err := load()
+    if err != nil { return err }
+    switch args[0] {
+    case "status":
+        if !state.Enabled {
+            _, _ = fmt.Fprintln(out, "Automatic daily updates: off")
+        } else {
+            _, _ = fmt.Fprintln(out, "Automatic daily updates: on (every 24 hours)")
+            if state.LastCheck > 0 {
+                _, _ = fmt.Fprintf(out, "Last automatic check: %s\n", time.Unix(state.LastCheck, 0).Local().Format(time.RFC3339))
+            }
+        }
+        return nil
+    case "on":
+        previous := state
+        state.Enabled = true
+        if err := save(state); err != nil { return err }
+        if err := enableScheduler(); err != nil {
+            if rollback := save(previous); rollback != nil {
+                return fmt.Errorf("scheduling failed: %v; could not restore preferences: %w", err, rollback)
+            }
+            return fmt.Errorf("could not schedule daily checks: %w", err)
+        }
+        _, _ = fmt.Fprintln(out, "Automatic daily updates enabled. Run '__CLI__ auto-update off' to disable.")
+        return nil
+    case "off":
+        // Save the opt-out before removing the schedule. Even if scheduler
+        // cleanup fails, a future job sees the disabled preference and exits.
+        state.Enabled = false
+        if err := save(state); err != nil { return err }
+        if err := disableScheduler(); err != nil { return fmt.Errorf("updates are off, but scheduler cleanup failed: %w", err) }
+        _, _ = fmt.Fprintln(out, "Automatic daily updates disabled.")
+        return nil
+    default:
+        return errors.New("usage: __CLI__ auto-update on|off|status")
+    }
+}

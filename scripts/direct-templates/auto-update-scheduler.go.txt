@@ -1,0 +1,150 @@
+package autoupdate
+
+import (
+    "fmt"
+    "html"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "runtime"
+    "strconv"
+    "strings"
+)
+
+const serviceID = "__OWNER__.__REPO__.auto-update"
+
+func executable() (string, error) {
+    exe, err := os.Executable()
+    if err != nil { return "", err }
+    exe, err = filepath.EvalSymlinks(exe)
+    if err != nil { return "", err }
+    if !filepath.IsAbs(exe) { return "", fmt.Errorf("updater executable must be absolute") }
+    return exe, nil
+}
+
+func command(name string, args ...string) error {
+    result, err := exec.Command(name, args...).CombinedOutput()
+    if err != nil { return fmt.Errorf("%s: %w: %s", name, err, strings.TrimSpace(string(result))) }
+    return nil
+}
+
+func enableScheduler() error {
+    exe, err := executable()
+    if err != nil { return err }
+    switch runtime.GOOS {
+    case "darwin": return enableLaunchd(exe)
+    case "linux": return enableSystemd(exe)
+    case "windows": return enableWindows(exe)
+    default: return fmt.Errorf("automatic updates unsupported on %s", runtime.GOOS)
+    }
+}
+
+func disableScheduler() error {
+    switch runtime.GOOS {
+    case "darwin": return disableLaunchd()
+    case "linux": return disableSystemd()
+    case "windows": return disableWindows()
+    default: return fmt.Errorf("automatic updates unsupported on %s", runtime.GOOS)
+    }
+}
+
+func launchAgentPath() (string, error) {
+    home, err := os.UserHomeDir()
+    if err != nil { return "", err }
+    return filepath.Join(home, "Library", "LaunchAgents", "com." + serviceID + ".plist"), nil
+}
+
+func launchAgentPlist(exe, logPath string) []byte {
+    escaped := func(s string) string { return html.EscapeString(s) }
+    return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.%s</string>
+<key>ProgramArguments</key><array><string>%s</string><string>upgrade</string><string>--automatic</string></array>
+<key>RunAtLoad</key><true/>
+<key>StartInterval</key><integer>86400</integer>
+<key>StandardOutPath</key><string>%s</string>
+<key>StandardErrorPath</key><string>%s</string>
+</dict></plist>
+`, escaped(serviceID), escaped(exe), escaped(logPath), escaped(logPath)))
+}
+
+func enableLaunchd(exe string) error {
+    path, err := launchAgentPath()
+    if err != nil { return err }
+    home, err := os.UserHomeDir()
+    if err != nil { return err }
+    logDir := filepath.Join(home, "Library", "Logs", "__CLI__")
+    if err := os.MkdirAll(logDir, 0700); err != nil { return err }
+    if err := writeAtomic(path, launchAgentPlist(exe, filepath.Join(logDir, "auto-update.log")), 0600); err != nil { return err }
+    domain := "gui/" + strconv.Itoa(os.Getuid())
+    label := domain + "/com." + serviceID
+    if exec.Command("launchctl", "print", label).Run() == nil { return nil }
+    // An SSH/headless session may lack a GUI bootstrap domain. In that case
+    // the saved LaunchAgent starts automatically at the next interactive login.
+    if exec.Command("launchctl", "print", domain).Run() != nil { return nil }
+    return command("launchctl", "bootstrap", domain, path)
+}
+
+func disableLaunchd() error {
+    path, err := launchAgentPath()
+    if err != nil { return err }
+    if err := os.Remove(path); err != nil && !os.IsNotExist(err) { return err }
+    domain := "gui/" + strconv.Itoa(os.Getuid())
+    label := domain + "/com." + serviceID
+    if exec.Command("launchctl", "print", label).Run() != nil { return nil }
+    return command("launchctl", "bootout", label)
+}
+
+func systemdUnitNames() (string, string, error) {
+    home, err := os.UserHomeDir()
+    if err != nil { return "", "", err }
+    dir := filepath.Join(home, ".config", "systemd", "user")
+    return filepath.Join(dir, serviceID + ".service"), filepath.Join(dir, serviceID + ".timer"), nil
+}
+
+func linuxService(exe string) []byte {
+    // % is special in systemd units; quotes support executable paths with spaces.
+    path := strings.ReplaceAll(exe, "%", "%%")
+    path = strings.ReplaceAll(path, "\\", "\\\\")
+    path = strings.ReplaceAll(path, `"`, `\"`)
+    return []byte(fmt.Sprintf("[Unit]\nDescription=__CLI__ automatic updates\n[Service]\nType=oneshot\nExecStart=\"%s\" upgrade --automatic\n", path))
+}
+
+func linuxTimer() []byte {
+    return []byte("[Unit]\nDescription=Daily __CLI__ release update check\n[Timer]\nOnCalendar=daily\nPersistent=true\nRandomizedDelaySec=30min\n[Install]\nWantedBy=timers.target\n")
+}
+
+func enableSystemd(exe string) error {
+    service, timer, err := systemdUnitNames()
+    if err != nil { return err }
+    if err := writeAtomic(service, linuxService(exe), 0600); err != nil { return err }
+    if err := writeAtomic(timer, linuxTimer(), 0600); err != nil { return err }
+    if err := command("systemctl", "--user", "daemon-reload"); err != nil { return err }
+    return command("systemctl", "--user", "enable", "--now", serviceID + ".timer")
+}
+
+func disableSystemd() error {
+    service, timer, err := systemdUnitNames()
+    if err != nil { return err }
+    // The timer can be absent if on was never successfully configured.
+    _ = exec.Command("systemctl", "--user", "disable", "--now", serviceID+".timer").Run()
+    for _, file := range []string{service, timer} {
+        if err := os.Remove(file); err != nil && !os.IsNotExist(err) { return err }
+    }
+    return command("systemctl", "--user", "daemon-reload")
+}
+
+func windowsTaskArgs(exe string) []string {
+    // schtasks expects one /TR argument containing an individually quoted path.
+    task := `\` + serviceID
+    return []string{"/Create", "/F", "/SC", "DAILY", "/ST", "10:00", "/TN", task, "/TR", `"` + exe + `" upgrade --automatic`}
+}
+
+func enableWindows(exe string) error { return command("schtasks.exe", windowsTaskArgs(exe)... ) }
+
+func disableWindows() error {
+    task := `\` + serviceID
+    if err := exec.Command("schtasks.exe", "/Query", "/TN", task).Run(); err != nil { return nil }
+    return command("schtasks.exe", "/Delete", "/F", "/TN", task)
+}

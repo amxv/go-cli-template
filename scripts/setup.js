@@ -404,6 +404,10 @@ function configureDirectDistribution(config) {
   generate("install.sh", "docs/public/install.sh");
   generate("install.ps1", "docs/public/install.ps1");
   generate("upgrade.go.txt", "internal/upgrade/upgrade.go");
+  generate("upgrade_test.go.txt", "internal/upgrade/upgrade_test.go");
+  generate("auto-update.go.txt", "internal/autoupdate/auto_update.go");
+  generate("auto-update-scheduler.go.txt", "internal/autoupdate/scheduler.go");
+  generate("auto-update_test.go.txt", "internal/autoupdate/auto_update_test.go");
 
   const appPath = path.join(rootDir, "internal/app/app.go");
   let app = fs.readFileSync(appPath, "utf8");
@@ -411,10 +415,18 @@ function configureDirectDistribution(config) {
   if (!app.includes(importLine)) {
     app = app.replace(/(^import \(\s*\n)/m, `$1${importLine}\n`);
   }
+  const autoUpdateImport = `"${config.goModule}/internal/autoupdate"`;
+  if (!app.includes(autoUpdateImport)) {
+    app = app.replace(/(^import \(\s*\n)/m, `$1${autoUpdateImport}\n`);
+  }
   if (!app.includes('case "upgrade":')) {
     app = app.replace(/(switch args\[0\] \{\s*\n)/, '$1case "upgrade":\nreturn upgrade.Run(args[1:], stdout)\n');
   }
-  app = app.replace(/"  hello \[name\]    print a greeting",/, '"  hello [name]    print a greeting",\n"  upgrade [--check]    install latest verified release",');
+  if (!app.includes('case "auto-update":')) {
+    app = app.replace(/(switch args\[0\] \{\s*\n)/, '$1case "auto-update":\nreturn autoupdate.Run(args[1:], stdout)\n');
+  }
+  app = app.replace(/"  hello \[name\]    print a greeting",/,
+    '"  hello [name]    print a greeting",\n"  upgrade [--check]    install latest verified release",\n"  auto-update on|off|status    schedule daily updates",');
   fs.writeFileSync(appPath, app);
 
   const makefilePath = path.join(rootDir, "Makefile");

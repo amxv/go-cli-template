@@ -155,7 +155,10 @@ test("direct bootstrap produces only native release + installers, then cleans it
   assert.match(read(checkout, "docs/public/install.sh"), /github\.com\/example\/spark/);
   assert.match(read(checkout, "docs/public/install.ps1"), /github\.com\/example\/spark/);
   assert.match(read(checkout, "internal/upgrade/upgrade.go"), /https:\/\/spark\.example\.com/);
+  assert.equal(fs.existsSync(path.join(checkout, "internal/autoupdate/auto_update.go")), true);
+  assert.equal(fs.existsSync(path.join(checkout, "internal/autoupdate/scheduler.go")), true);
   assert.match(read(checkout, "internal/app/app.go"), /case "upgrade":/);
+  assert.match(read(checkout, "internal/app/app.go"), /case "auto-update":/);
   assert.match(read(checkout, ".github/workflows/release.yml"), /SHA256SUMS/);
   assert.doesNotMatch(read(checkout, ".github/workflows/release.yml"), /npm|NPM_TOKEN/);
   assert.doesNotMatch(read(checkout, "Makefile"), /npm|NPM_TOKEN/);
@@ -167,6 +170,10 @@ test("direct bootstrap produces only native release + installers, then cleans it
   run(checkout, "sh", ["-n", "docs/public/install.sh"]);
   run(checkout, "make", ["check"]);
   run(checkout, "make", ["build"]);
+  const windowsBuild = spawnSync("go", ["build", "./..."], {
+    cwd: checkout, encoding: "utf8", env: { ...process.env, GOOS: "windows", GOARCH: "amd64", CGO_ENABLED: "0" }
+  });
+  assert.equal(windowsBuild.status, 0, `cross-platform generated CLI must compile for Windows:\n${windowsBuild.stderr}`);
   if (process.platform !== "win32") {
     const releaseDir = path.join(checkout, "fake-release");
     const commands = path.join(releaseDir, "commands");
@@ -220,6 +227,49 @@ esac
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(fs.readFileSync(installed), binary);
   }
+  if (process.platform === "darwin" || process.platform === "linux") {
+    const fakeHome = path.join(checkout, "scheduler-home");
+    const commands = path.join(checkout, "scheduler-bin");
+    fs.mkdirSync(fakeHome, { recursive: true });
+    fs.mkdirSync(commands, { recursive: true });
+    const registrar = process.platform === "darwin" ? "launchctl" : "systemctl";
+    const scheduleLog = path.join(checkout, "scheduler-calls.log");
+    fs.writeFileSync(path.join(commands, registrar), `#!/bin/sh
+printf '%s\n' "$*" >> "$SCHEDULER_TEST_LOG"
+if [ "$1" = print ]; then
+  case "$2" in */com.example.spark.auto-update) exit 1 ;; esac
+fi
+exit 0
+`);
+    fs.chmodSync(path.join(commands, registrar), 0o755);
+    const env = { ...process.env, HOME: fakeHome, XDG_CONFIG_HOME: path.join(fakeHome, ".config"),
+      PATH: `${commands}:${process.env.PATH}`, SCHEDULER_TEST_LOG: scheduleLog };
+    const runCli = (...args) => spawnSync(path.join(checkout, "dist/spark"), args, { cwd: checkout, encoding: "utf8", env });
+    let result = runCli("auto-update", "status");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /off/);
+    result = runCli("upgrade", "--automatic");
+    assert.equal(result.status, 0, "disabled scheduler must never perform a network check");
+    result = runCli("auto-update", "on");
+    assert.equal(result.status, 0, result.stderr);
+    result = runCli("auto-update", "status");
+    assert.match(result.stdout, /on \(every 24 hours\)/);
+    const recorded = fs.readFileSync(scheduleLog, "utf8");
+    if (process.platform === "darwin") {
+      assert.match(recorded, /bootstrap gui\//);
+      const agents = path.join(fakeHome, "Library", "LaunchAgents");
+      assert.match(fs.readFileSync(path.join(agents, "com.example.spark.auto-update.plist"), "utf8"), /86400/);
+    } else {
+      assert.match(recorded, /--user enable --now example.spark.auto-update.timer/);
+      assert.match(fs.readFileSync(path.join(fakeHome, ".config/systemd/user/example.spark.auto-update.timer"), "utf8"), /OnCalendar=daily/);
+    }
+    result = runCli("auto-update", "off");
+    assert.equal(result.status, 0, result.stderr);
+    result = runCli("auto-update", "status");
+    assert.match(result.stdout, /off/);
+    result = runCli("upgrade", "--automatic");
+    assert.equal(result.status, 0, "opt-out must persist across CLI processes");
+  }
   const invalid = spawnSync(path.join(checkout, "dist/spark"), ["upgrade", "--wrong-option"], { cwd: checkout, encoding: "utf8" });
   assert.notEqual(invalid.status, 0);
   assert.match(invalid.stderr, /usage: spark upgrade/);
@@ -228,6 +278,7 @@ esac
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);
   assert.equal(fs.existsSync(path.join(checkout, "internal/upgrade/upgrade.go")), true);
+  assert.equal(fs.existsSync(path.join(checkout, "internal/autoupdate/auto_update.go")), true);
   assert.equal(fs.existsSync(path.join(checkout, "scripts/postinstall.js")), false);
   run(checkout, "make", ["check"]);
   run(checkout, "make", ["build"]);

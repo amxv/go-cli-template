@@ -6,7 +6,7 @@ Guidance for coding agents working in `go-cli-template`.
 
 This repo is a generic starter for Go command-line tools. Bootstrap can choose
 `--distribution npm` or `--distribution direct` (GitHub Releases, website
-install scripts, and a native `upgrade` command).
+install scripts, native `upgrade`, and optional daily background updates).
 
 The sample command is `mycli`. Replace it with your actual CLI name and behavior.
 
@@ -54,6 +54,10 @@ and license metadata. It intentionally does **not** rewrite `README.md` or the
 Astro/Markdown documentation pages. Write those for the new project yourself.
 For `direct`, don't pass `--npm-package`. Bootstrap removes npm packaging and
 replaces it with website installers + GitHub Release checksums and `upgrade`.
+It also adds `auto-update on|off|status` (off by default) and background
+`upgrade --automatic`. Daily checks are managed by macOS LaunchAgents,
+Linux systemd user timers, or Windows Task Scheduler. They compare the latest
+stable version before installing and keep the opt-in after failed checks.
 After all identity/deployment settings are finalized, run `make bootstrap-clean`
 to retire bootstrap scripts, tests, and one-time config. Keep app/release/install
 and docs files intact.
@@ -86,7 +90,7 @@ Release pipeline triggers on `v*` tags and expects:
   the `package.json` name is publishable and postinstall points to the repo.
 - For direct mode only: release workflow produces six native binaries and
   `SHA256SUMS`, the website serves `install.sh` and `install.ps1`, and the
-  `upgrade [--check]` command is implemented.
+  `upgrade [--check]` and `auto-update on|off|status` commands are implemented.
 - public GitHub visibility is the normal anonymous npm install path.
 
 ## Guardrails

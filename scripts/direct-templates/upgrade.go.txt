@@ -1,97 +1,168 @@
-// Package upgrade downloads the project-owned installer and executes it.
-// The installer verifies GitHub Release SHA-256 checksums before replacement.
+// Package upgrade implements version-aware, checksum-verified CLI upgrades.
+// Auto-update scheduling is managed independently by package autoupdate.
 package upgrade
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
-	"time"
+    "errors"
+    "fmt"
+    "io"
+    "net/http"
+    "net/url"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "runtime"
+    "strconv"
+    "strings"
+    "time"
+
+    "__MODULE__/internal/autoupdate"
+    "__MODULE__/internal/buildinfo"
 )
 
 const installerBase = "__SITE__"
+const latestPage = "https://github.com/__OWNER__/__REPO__/releases/latest"
+const tagPrefix = "/__OWNER__/__REPO__/releases/tag/v"
+
+func parseVersion(version string) ([3]uint64, error) {
+    var parts [3]uint64
+    version = strings.TrimPrefix(version, "v")
+    values := strings.Split(version, ".")
+    if len(values) != 3 { return parts, fmt.Errorf("invalid stable version %q", version) }
+    for i, value := range values {
+        if value == "" { return parts, fmt.Errorf("invalid stable version %q", version) }
+        for _, digit := range value {
+            if digit < '0' || digit > '9' { return parts, fmt.Errorf("invalid stable version %q", version) }
+        }
+        number, err := strconv.ParseUint(value, 10, 64)
+        if err != nil { return parts, err }
+        parts[i] = number
+    }
+    return parts, nil
+}
+
+func newer(latest, current string) (bool, error) {
+    target, err := parseVersion(latest)
+    if err != nil { return false, err }
+    installed, err := parseVersion(current)
+    if err != nil { return false, err }
+    for i := 0; i < 3; i++ {
+        if target[i] != installed[i] { return target[i] > installed[i], nil }
+    }
+    return false, nil
+}
+
+func tagFromLocation(location string) (string, error) {
+    page, err := url.Parse(latestPage)
+    if err != nil { return "", err }
+    redirect, err := url.Parse(location)
+    if err != nil { return "", err }
+    resolved := page.ResolveReference(redirect)
+    if resolved.Scheme != "https" || resolved.Host != "github.com" || resolved.User != nil ||
+        resolved.RawQuery != "" || resolved.Fragment != "" || !strings.HasPrefix(resolved.Path, tagPrefix) {
+        return "", errors.New("untrusted latest-release redirect")
+    }
+    version := strings.TrimPrefix(resolved.Path, tagPrefix)
+    if _, err := parseVersion(version); err != nil { return "", err }
+    return version, nil
+}
+
+func latestVersion() (string, error) {
+    request, err := http.NewRequest(http.MethodHead, latestPage, nil)
+    if err != nil { return "", err }
+    request.Header.Set("User-Agent", "__CLI__-updater")
+    client := &http.Client{
+        Timeout: 20 * time.Second,
+        CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+    }
+    response, err := client.Do(request)
+    if err != nil { return "", err }
+    defer response.Body.Close()
+    if response.StatusCode != http.StatusFound && response.StatusCode != http.StatusMovedPermanently &&
+        response.StatusCode != http.StatusTemporaryRedirect && response.StatusCode != http.StatusPermanentRedirect {
+        return "", fmt.Errorf("latest GitHub release returned HTTP %d", response.StatusCode)
+    }
+    return tagFromLocation(response.Header.Get("Location"))
+}
 
 func Run(args []string, out io.Writer) error {
-	if len(args) > 1 || (len(args) == 1 && args[0] != "--check") {
-		return errors.New("usage: __CLI__ upgrade [--check]")
-	}
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("find executable: %w", err)
-	}
-	executable, err = filepath.Abs(executable)
-	if err != nil {
-		return err
-	}
+    automatic := len(args) == 1 && args[0] == "--automatic"
+    check := len(args) == 1 && args[0] == "--check"
+    if len(args) > 1 || (len(args) == 1 && !automatic && !check) {
+        return errors.New("usage: __CLI__ upgrade [--check]")
+    }
+    if automatic {
+        shouldCheck, err := autoupdate.Claim()
+        if err != nil { return err }
+        if !shouldCheck { return nil }
+    }
+    latest, err := latestVersion()
+    if err != nil { return fmt.Errorf("check for upgrades: %w", err) }
+    current := buildinfo.CurrentVersion()
+    if check {
+        _, _ = fmt.Fprintf(out, "Installed: %s\nLatest: %s\n", current, latest)
+    }
+    hasUpgrade, err := newer(latest, current)
+    if err != nil {
+        // Never automatically overwrite a development build with a release.
+        if automatic { return fmt.Errorf("cannot auto-update development version %q: %w", current, err) }
+        if check { return nil }
+        return err
+    }
+    if !hasUpgrade {
+        if !check { _, _ = fmt.Fprintln(out, "Already up to date.") }
+        return nil
+    }
+    if check {
+        _, _ = fmt.Fprintln(out, "Update available.")
+        return nil
+    }
+    if automatic {
+        enabled, err := autoupdate.Enabled()
+        if err != nil || !enabled { return err }
+    }
+    return install(latest, automatic, out)
+}
 
-	name := "install.sh"
-	if runtime.GOOS == "windows" {
-		name = "install.ps1"
-	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	response, err := client.Get(installerBase + "/" + name)
-	if err != nil {
-		return fmt.Errorf("download installer: %w", err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("installer request returned HTTP %d", response.StatusCode)
-	}
-	source, err := io.ReadAll(io.LimitReader(response.Body, 256*1024+1))
-	if err != nil {
-		return err
-	}
-	if len(source) > 256*1024 {
-		return errors.New("installer exceeds size limit")
-	}
+func install(version string, automatic bool, out io.Writer) error {
+    executable, err := os.Executable()
+    if err != nil { return fmt.Errorf("find executable: %w", err) }
+    executable, err = filepath.EvalSymlinks(executable)
+    if err != nil { return err }
+    name := "install.sh"
+    if runtime.GOOS == "windows" { name = "install.ps1" }
+    client := &http.Client{Timeout: 30 * time.Second}
+    response, err := client.Get(installerBase + "/" + name)
+    if err != nil { return fmt.Errorf("download installer: %w", err) }
+    defer response.Body.Close()
+    if response.StatusCode != http.StatusOK { return fmt.Errorf("installer returned HTTP %d", response.StatusCode) }
+    source, err := io.ReadAll(io.LimitReader(response.Body, 256*1024+1))
+    if err != nil { return err }
+    if len(source) > 256*1024 { return errors.New("installer exceeds size limit") }
+    file, err := os.CreateTemp("", "__CLI__-upgrade-*"+filepath.Ext(name))
+    if err != nil { return err }
+    if _, err = file.Write(source); err != nil { _ = file.Close(); _ = os.Remove(file.Name()); return err }
+    if err = file.Close(); err != nil { _ = os.Remove(file.Name()); return err }
+    if automatic {
+        enabled, err := autoupdate.Enabled()
+        if err != nil || !enabled { _ = os.Remove(file.Name()); return err }
+    }
 
-	tmp, err := os.CreateTemp("", "__CLI__-upgrade-*"+filepath.Ext(name))
-	if err != nil {
-		return err
-	}
-	if _, err = tmp.Write(source); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	if err = tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-
-	if runtime.GOOS == "windows" {
-		arguments := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", tmp.Name(), "-Upgrade", "-Target", executable, "-WaitForPid", fmt.Sprint(os.Getpid())}
-		if len(args) == 1 {
-			arguments = []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", tmp.Name(), "-Check", "-Target", executable}
-		}
-		command := exec.Command("powershell.exe", arguments...)
-		command.Stdout = out
-		command.Stderr = os.Stderr
-		if len(args) == 1 {
-			defer os.Remove(tmp.Name())
-			return command.Run()
-		}
-		if err := command.Start(); err != nil {
-			_ = os.Remove(tmp.Name())
-			return err
-		}
-		_ = command.Process.Release()
-		fmt.Fprintln(out, "Verified upgrade started; replacement completes after this command exits.")
-		return nil
-	}
-	defer os.Remove(tmp.Name())
-	mode := "upgrade"
-	if len(args) == 1 {
-		mode = "--check"
-	}
-	command := exec.Command("sh", tmp.Name(), mode)
-	command.Env = append(os.Environ(), "CLI_UPGRADE_TARGET="+executable)
-	command.Stdout = out
-	command.Stderr = os.Stderr
-	return command.Run()
+    if runtime.GOOS == "windows" {
+        command := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-File", file.Name(), "-Upgrade", "-Target", executable, "-WaitForPid", fmt.Sprint(os.Getpid()))
+        command.Env = append(os.Environ(), "CLI_VERSION="+version)
+        command.Stdout = out
+        command.Stderr = os.Stderr
+        if err := command.Start(); err != nil { _ = os.Remove(file.Name()); return err }
+        _ = command.Process.Release()
+        _, _ = fmt.Fprintln(out, "Verified upgrade started; Windows replacement completes after this command exits.")
+        return nil // Windows helper removes its own temporary script.
+    }
+    defer os.Remove(file.Name())
+    command := exec.Command("sh", file.Name(), "upgrade")
+    command.Env = append(os.Environ(), "CLI_UPGRADE_TARGET="+executable, "CLI_VERSION="+version)
+    command.Stdout = out
+    command.Stderr = os.Stderr
+    return command.Run()
 }
