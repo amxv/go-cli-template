@@ -36,6 +36,15 @@ make bootstrap BOOTSTRAP_ARGS='--cli-name pluck --go-module github.com/acme/pluc
 
 ## Release process
 
+For generated repositories, production documentation deployment is separate
+from the release tag. `.github/workflows/docs.yml` deploys only on `docs/**`
+changes to `main` using the Vercel CLI. Keep the Vercel Git connection but
+`git.deploymentEnabled: false` to avoid counted, duplicate Git deployments.
+Before the first docs deployment, configure GitHub Actions secrets
+`VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` from the linked
+`docs/` Vercel project. Never commit these values. Template source repositories
+run docs checks but do not deploy automatically.
+
 1. Ensure `main` is green and Astro checks pass:
 
 ```bash

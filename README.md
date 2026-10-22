@@ -76,25 +76,32 @@ Host the site on Vercel with **Root Directory `docs`**. `docs/src/data/docs.ts` 
 
 ### Automatic docs deployments
 
-The template already includes a tested **`docs/scripts/should-build.mjs`** and
-**`docs/vercel.json`** wired with `ignoreCommand`. Link the Vercel project to
-GitHub, set its Root Directory to `docs`, and keep production Git deployments
-enabled for `main`. Preview branches are disabled by default through
-`git.deploymentEnabled`.
+**Quota-safe by default:** `.github/workflows/docs.yml` triggers on `main` only
+when a file under `docs/` changes. It validates the Astro site and calls the
+Vercel CLI to create a production deployment. Go source, root release metadata,
+and optional Swift menu bar changes **do not start a docs deployment at all**.
+Pull requests can run docs checks without deploying. You can request an explicit
+production redeployment using the workflow's manual trigger.
 
-- A push that changes only Go source, root release metadata, or the optional
-  Swift menu bar code skips the Astro build.
-- Any change under `docs/`, including `docs/public/install.sh` or
-  `docs/public/install.ps1`, builds and deploys the site.
-- The first build or an inconclusive Git diff builds rather than accidentally
-  skipping a real documentation change.
+Keep the Vercel project **connected to GitHub** and set its Root Directory to
+`docs`, but leave `git.deploymentEnabled: false` in `docs/vercel.json`. That
+disables Vercel's *automatic Git-triggered* deployments, preventing duplicates.
+The build and install commands remain configured for the real docs deployments.
+Do **not** add Vercel's `ignoreCommand`: that cancels a deployment after it is
+created and **still counts against deployment quotas**.
 
-Run `make docs-test` to exercise the change detection against isolated Git
-repositories. **Vercel's Ignored Build Step cancels unnecessary builds, but
-the resulting canceled deployment still counts toward deployment quotas.**
-For a strict per-day deployment limit, use a path-scoped GitHub Actions deploy
-instead of automatic Git deploys, or Vercel's native skip-unaffected-projects
-feature when the repository meets its JavaScript workspace requirements.
+During the one-time Vercel setup, add these three GitHub Actions secrets to
+the **generated project's** repository:
+
+- `VERCEL_TOKEN`: a Vercel account access token (keep it private).
+- `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`: the IDs from `docs/.vercel/project.json`
+  after running `vercel link` inside `docs/`.
+
+The Actions job fails with a clear error if any are missing. Template-source
+repositories skip the deployment step. `make docs-test` validates the path
+decision and deployment configuration with isolated Git fixtures; the retained
+`docs/scripts/should-build.mjs` is a **test helper**, not a Vercel ignored-build
+step. Only actual documentation deployments use Vercel's deployment quota.
 
 ## Direct installation and upgrades
 

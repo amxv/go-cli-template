@@ -66,10 +66,16 @@ For Vercel, use `docs` as the Root Directory. The committed `docs/vercel.json`
 installs and builds the isolated docs workspace and serves `docs/dist` without
 sharing the Go CLI's root `dist/` directory.
 
-The site also comes with `docs/scripts/should-build.mjs`, configured as Vercel's
-Ignored Build Step. It builds on `main` when `docs/` changed (including website
-installers), but skips Astro builds for code-only commits. It handles multi-commit
-pushes and fails open if Vercel's shallow Git checkout cannot resolve the base.
-Run `make docs-test` before deploying. **Ignored/canceled Vercel builds still
-count toward deployment limits**; true zero-quota skipping requires an eligible
-workspace or a docs-path-filtered GitHub Actions deploy instead of Git auto-deploy.
+To avoid counting Go-only pushes toward Vercel's deployment quota, the
+committed `.github/workflows/docs.yml` runs only when `docs/**` changes on
+`main`. It tests and checks Astro before deploying production docs using the
+Vercel CLI. The project remains connected to GitHub, but
+`docs/vercel.json` sets `git.deploymentEnabled` to `false` to prevent duplicate
+automatic Git deployments. Do not add `ignoreCommand`: canceled deployments
+still count toward Vercel's deployment quota.
+
+Before the first generated-project deployment, configure the repository's
+GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`
+from a Vercel-linked `docs/` directory. `make docs-test` validates the GitHub
+path trigger and the retained, independent Git diff helper
+`docs/scripts/should-build.mjs`. The helper is **not** run by Vercel itself.

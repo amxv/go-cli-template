@@ -127,6 +127,8 @@ test("opt-in menu bar builds, installs, verifies and survives bootstrap cleanup"
   run(fixture, "codesign", ["--verify", "--deep", "--strict", path.join(installDir, "Spark.app")]);
 
   run(fixture, process.execPath, ["scripts/cleanup.js"]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(fixture, "docs/vercel.json"), "utf8")).git.deploymentEnabled, false);
+  assert.match(fs.readFileSync(path.join(fixture, ".github/workflows/docs.yml"), "utf8"), /docs\/\*\*/);
   assert.equal(fs.existsSync(path.join(fixture, "scripts/direct-templates/menubar")), false);
   assert.equal(fs.existsSync(path.join(fixture, "docs/scripts/should-build.mjs")), true);
   assert.equal(fs.existsSync(path.join(fixture, "apps/menubar/Sources/main.swift")), true);

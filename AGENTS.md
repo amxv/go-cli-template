@@ -82,14 +82,18 @@ and docs files intact.
 - keep repo-specific content/config local instead of forking shared shell files
 - keep all web tooling under `docs/`; Vercel should use `docs` as the Root Directory
 
-The docs site's committed `docs/vercel.json` enables automatic Git deployments
-on `main` only and invokes `node scripts/should-build.mjs` as an Ignored Build
-Step. That testable script compares commit ranges from the repository root and
-ignores Go/Swift-only pushes while building for any `docs/` change. Check
-`make docs-test` before deploying a scaffold. Missing commit history fails
-open. **Ignored builds still count as canceled deployments toward Vercel's
-deployment limits**; for strict limits use a path-filtered GitHub Actions
-deploy, with Git auto deploys turned off, rather than claiming zero quota use.
+The committed `.github/workflows/docs.yml` filters `main` pushes through
+`paths: ["docs/**"]` **before any Vercel deployment is requested**. It runs
+Astro check and deploys to Vercel only after a docs change. Root code and Swift
+app changes create no Vercel deployment/quota entry. Keep the Vercel project's
+GitHub connection and Root Directory `docs`, but preserve
+`git.deploymentEnabled: false` in `docs/vercel.json`, with no `ignoreCommand`
+(which cancels *after* creating a counted deployment). Setup requires the
+generated project's GitHub Actions secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
+and `VERCEL_PROJECT_ID` from the linked docs project; never commit them.
+`docs/scripts/should-build.mjs` remains a tested local helper only. Check
+`make docs-test` before deploying a scaffold. Do not re-enable Vercel Git
+auto-deploys or introduce duplicate deployment triggers.
 
 ## Optional macOS menu bar scaffold
 
