@@ -122,6 +122,8 @@ test("bootstrap rewrites Go module and machine metadata without touching prose",
   assert.equal(fs.existsSync(path.join(checkout, "scripts/provision-vercel.mjs")), false);
   assert.equal(JSON.parse(read(checkout, "docs/vercel.json")).git.deploymentEnabled, false);
   assert.match(read(checkout, ".github/workflows/docs.yml"), /docs\/\*\*/);
+  assert.match(read(checkout, ".github/workflows/docs.yml"), /working-directory: \./);
+  assert.match(read(checkout, ".github/workflows/docs.yml"), /cp -R docs\/\.vercel\/output \.vercel\/output/);
   assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true,
     "cleanup must retain Vercel's production affected-path filter");
   assert.equal(fs.existsSync(path.join(checkout, "scripts/direct-templates/menubar")), false);
@@ -287,6 +289,8 @@ exit 0
   assert.equal(fs.existsSync(path.join(checkout, "scripts/provision-vercel.mjs")), false);
   assert.equal(JSON.parse(read(checkout, "docs/vercel.json")).git.deploymentEnabled, false);
   assert.match(read(checkout, ".github/workflows/docs.yml"), /docs\/\*\*/);
+  assert.match(read(checkout, ".github/workflows/docs.yml"), /working-directory: \./);
+  assert.match(read(checkout, ".github/workflows/docs.yml"), /cp -R docs\/\.vercel\/output \.vercel\/output/);
   assert.equal(fs.existsSync(path.join(checkout, "docs/scripts/should-build.mjs")), true);
   assert.equal(fs.existsSync(path.join(checkout, "project.config.json")), false);
   assert.equal(fs.existsSync(path.join(checkout, "docs/public/install.sh")), true);

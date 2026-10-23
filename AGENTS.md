@@ -96,6 +96,9 @@ mint a project-scoped token. GitHub stores only `VERCEL_TOKEN` as an Actions
 Never print or commit tokens, or provision the canonical source template.
 The GitHub Docs workflow builds static Astro output in CI and deploys with
 `--prebuilt`, so project-scoped tokens need not fetch broad Vercel settings.
+It builds in `docs/` but stages `docs/.vercel/output` at root `.vercel/output`
+and deploys from the **repository root**. The Vercel Root Directory is already
+`docs`; running `vercel deploy` from `docs/` resolves the nonexistent `docs/docs`.
 Agents still use `make docs-check` for local validation.
 `docs/scripts/should-build.mjs` remains a tested local helper only. Check
 `make docs-test` before deploying a scaffold. Do not re-enable Vercel Git

@@ -80,7 +80,11 @@ Host the site on Vercel with **Root Directory `docs`**. `docs/src/data/docs.ts` 
 when a file under `docs/` changes. It validates the Astro site, builds static
 output in GitHub CI, and deploys through Vercel's Build Output API v3 with
 `vercel deploy --prebuilt`. This avoids broad project-settings queries that
-can fail with project-scoped tokens. Go source, root release metadata,
+can fail with project-scoped tokens. The workflow builds inside `docs/`,
+stages `docs/.vercel/output` at repository-root `.vercel/output`, and invokes
+Vercel **from the repository root**. Deploying from `docs/` would incorrectly
+resolve the already-configured Vercel Root Directory to `docs/docs`.
+Go source, root release metadata,
 and optional Swift menu bar changes **do not start a docs deployment at all**.
 Pull requests can run docs checks without deploying. You can request an explicit
 production redeployment using the workflow's manual trigger.

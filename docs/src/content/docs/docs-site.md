@@ -56,15 +56,31 @@ make docs-check
 ```
 
 Astro check is sufficient for local validation. No separate production build is
-needed when editing the docs; Vercel handles that during deployment.
+needed when editing the docs; GitHub Actions builds before deploying to Vercel.
 
 ## Deployment
 
-Vercel builds the docs site to static output in `docs/dist` during deployment.
+GitHub Actions builds the docs site to static output in `docs/dist` before deployment.
 
 For Vercel, use `docs` as the Root Directory. The committed `docs/vercel.json`
 installs and builds the isolated docs workspace and serves `docs/dist` without
 sharing the Go CLI's root `dist/` directory.
+The project settings should use framework `astro`, install command
+`bun install --frozen-lockfile`, build command `bun run build`, and output
+`dist`. A newly created Vercel project may otherwise default to repository
+root `.`.
+
+For a custom **subdomain**, attach it with the project name and read back the
+specific DNS instructions:
+
+```bash
+vercel domains add <subdomain.example.com> <project-name> --scope <team>
+vercel domains verify <subdomain.example.com> --project <project-name> --scope <team> --json
+```
+
+Use the exact `recommended.records` target for Cloudflare with proxying
+disabled, then verify again. The generic `vercel domains inspect` output may
+describe the parent domain instead of the subdomain's needed DNS record.
 
 To avoid counting Go-only pushes toward Vercel's deployment quota, the
 committed `.github/workflows/docs.yml` runs only when `docs/**` changes on
@@ -82,6 +98,10 @@ protected Vercel CLI session (or a macOS Keychain fallback), writes
 `VERCEL_PROJECT_ID` as GitHub Actions variables. GitHub CI produces a
 Vercel Build Output API v3 static bundle and deploys with `--prebuilt` so
 project-scoped tokens do not require Vercel's broad project-settings calls.
+The build runs within `docs/` but the prebuilt bundle is copied from
+`docs/.vercel/output` into repository-root `.vercel/output`; Vercel is invoked
+**from the repository root**. Never deploy from `docs/` with Vercel Root
+Directory already set to `docs`, or the CLI looks for `docs/docs`.
 Agents only use `make docs-check` locally. `make docs-test` validates the GitHub
 path trigger and the retained, independent Git diff helper
 `docs/scripts/should-build.mjs`. The helper is **not** run by Vercel itself.

@@ -27,8 +27,8 @@ jobs:
       run:
         working-directory: docs
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - uses: oven-sh/setup-bun@v2
@@ -54,6 +54,9 @@ jobs:
       # Template source projects do not own a real Vercel deployment target.
       # Generated projects deploy only with their own configured credentials.
       - name: Deploy production docs to Vercel
+        # Vercel's Root Directory is docs/. Running from docs/ would resolve
+        # that to docs/docs, so the deploy runs from the repository root.
+        working-directory: .
         if: >-
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
           github.ref == 'refs/heads/main' &&
@@ -70,4 +73,10 @@ jobs:
           fi
           # Project-scoped tokens can fail broad CLI project-settings queries.
           # The Build Output API bundle avoids 'vercel pull/build' entirely.
+          # --prebuilt reads .vercel/output relative to the CLI's working
+          # directory, not relative to Vercel's configured Root Directory.
+          test -f docs/.vercel/output/config.json
+          mkdir -p .vercel
+          cp -R docs/.vercel/output .vercel/output
+          test -f .vercel/output/config.json
           npx --yes vercel@latest deploy --prebuilt --prod --yes --non-interactive

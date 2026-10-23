@@ -44,6 +44,9 @@ Before the first docs deployment, configure GitHub Actions secrets
 `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` from the linked
 `docs/` Vercel project. Never commit these values. Template source repositories
 run docs checks but do not deploy automatically.
+The docs workflow builds within `docs/`, stages the Build Output API bundle
+at repository-root `.vercel/output`, then runs Vercel from the repository
+root to avoid looking for `docs/docs`.
 
 1. Ensure `main` is green and Astro checks pass:
 
